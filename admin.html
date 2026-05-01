@@ -688,7 +688,7 @@
 
   function renderIdentityPanel(s) {
     const teams = (typeof teamsSortedByName === 'function') ? teamsSortedByName() : [];
-    const buildOptions = (currentShort) => {
+    const buildOptions = (currentShort, currentName) => {
       let html = `<option value="">— Empty / TBD —</option>`;
       teams.forEach(({ short, name }) => {
         const sel = short === currentShort ? ' selected' : '';
@@ -696,7 +696,7 @@
       });
       // If current short isn't in the team list, add it as a "Custom" option so we don't lose it
       if (currentShort && !teams.find(t => t.short === currentShort)) {
-        html += `<option value="${escapeAttr(currentShort)}" selected>Custom: ${escapeHtml(s.topSeed.name || currentShort)}</option>`;
+        html += `<option value="${escapeAttr(currentShort)}" selected>Custom: ${escapeHtml(currentName || currentShort)}</option>`;
       }
       return html;
     };
@@ -709,14 +709,14 @@
             <label>Top Seed</label>
             <div class="team-input">
               <span class="team-dot top"></span>
-              <select id="topTeamSelect">${buildOptions(s.topSeed.short)}</select>
+              <select id="topTeamSelect">${buildOptions(s.topSeed.short, s.topSeed.name)}</select>
             </div>
           </div>
           <div class="control-group">
             <label>Bottom Seed</label>
             <div class="team-input">
               <span class="team-dot bot"></span>
-              <select id="botTeamSelect">${buildOptions(s.botSeed.short)}</select>
+              <select id="botTeamSelect">${buildOptions(s.botSeed.short, s.botSeed.name)}</select>
             </div>
           </div>
         </div>
