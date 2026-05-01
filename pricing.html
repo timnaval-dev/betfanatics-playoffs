@@ -97,12 +97,13 @@
 
   /* ROUND TABS */
   .round-tabs {
-    display: flex; gap: 4px; margin-bottom: 16px;
+    display: flex; justify-content: center; gap: 4px; margin-bottom: 16px;
     background: var(--bg-secondary); border: 1px solid var(--border);
     border-radius: 10px; padding: 4px;
+    flex-wrap: wrap;
   }
   .round-tab {
-    flex: 1; padding: 10px 16px; text-align: center; cursor: pointer;
+    padding: 10px 28px; text-align: center; cursor: pointer;
     border-radius: 7px; font-family: var(--display); font-size: 14px;
     font-weight: 600; color: var(--text-tertiary);
     transition: all 0.15s; background: transparent; border: none;
@@ -120,13 +121,21 @@
   /* SERIES SUB-TABS */
   .series-tabs {
     display: grid; gap: 8px; margin-bottom: 24px;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .series-tabs[data-round="round1"] { grid-template-columns: repeat(4, 1fr); }
+  .series-tabs[data-round="round2"] { grid-template-columns: repeat(2, 1fr); }
+  .series-tabs[data-round="round3"] { grid-template-columns: 1fr; max-width: 320px; margin-left: auto; margin-right: auto; }
+  .series-tabs[data-round="round4"] { grid-template-columns: 1fr; max-width: 320px; margin-left: auto; margin-right: auto; }
+  @media (max-width: 700px) {
+    .series-tabs[data-round="round1"] { grid-template-columns: repeat(2, 1fr); }
+    .series-tabs[data-round="round2"] { grid-template-columns: 1fr; }
   }
   .series-tab {
     background: var(--bg-secondary); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 12px; cursor: pointer;
-    transition: all 0.15s; text-align: left; font-family: var(--body);
-    color: var(--text-primary); display: flex; flex-direction: column; gap: 4px;
+    border-radius: 10px; padding: 14px 12px; cursor: pointer;
+    transition: all 0.15s; font-family: var(--body);
+    color: var(--text-primary);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
   }
   .series-tab:hover:not(:disabled) { border-color: var(--accent); }
   .series-tab.active {
@@ -138,21 +147,26 @@
     cursor: not-allowed; opacity: 0.5;
   }
   .series-tab-teams {
-    display: flex; align-items: center; justify-content: space-between;
-    font-family: var(--display); font-size: 13px; font-weight: 600;
+    font-family: var(--display); font-size: 14px; font-weight: 600;
+    text-align: center; line-height: 1.2;
   }
   .series-tab-score {
-    font-family: var(--mono); font-size: 16px; font-weight: 600;
+    font-family: var(--mono); font-size: 18px; font-weight: 600;
     color: var(--accent-bright);
-  }
-  .series-tab-meta {
-    font-size: 10px; color: var(--text-tertiary);
-    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 14px; border-radius: 6px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid var(--accent-dim);
+    letter-spacing: 0.04em;
   }
   .series-tab.tbd .series-tab-teams { color: var(--text-disabled); }
   .series-tab.complete {
     border-color: var(--positive);
     background: linear-gradient(135deg, rgba(52, 211, 153, 0.05), transparent);
+  }
+  .series-tab.complete .series-tab-score {
+    color: var(--positive);
+    background: rgba(52, 211, 153, 0.1);
+    border-color: var(--positive);
   }
 
   /* CONTROLS */
@@ -174,8 +188,11 @@
   }
 
   .controls-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    display: grid; grid-template-columns: repeat(2, 1fr);
     gap: 18px;
+  }
+  @media (max-width: 600px) {
+    .controls-grid { grid-template-columns: 1fr; }
   }
   .control-group label {
     display: block; font-family: var(--mono); font-size: 10px;
@@ -232,8 +249,8 @@
   .manual-game.played {
     opacity: 0.5;
   }
-  .manual-game.played.top-won { border-color: rgba(249, 115, 22, 0.4); }
-  .manual-game.played.bot-won { border-color: rgba(6, 182, 212, 0.4); }
+  .manual-game.played.top-won { border-color: color-mix(in srgb, var(--top-color) 50%, transparent); }
+  .manual-game.played.bot-won { border-color: color-mix(in srgb, var(--bot-color) 50%, transparent); }
   .manual-game-label {
     font-family: var(--mono); font-size: 9px; font-weight: 500;
     color: var(--text-tertiary); text-transform: uppercase;
@@ -267,7 +284,7 @@
   .state-display { display: flex; align-items: center; gap: 22px; }
   .state-team {
     display: flex; flex-direction: column; align-items: center;
-    gap: 6px; min-width: 110px;
+    gap: 6px; min-width: 140px; max-width: 170px;
   }
   .state-team-name {
     font-family: var(--display); font-size: 12px; font-weight: 600;
@@ -310,12 +327,14 @@
     background: var(--bg-tertiary); color: var(--text-tertiary);
   }
   .game-pip.top-home {
-    background: rgba(249, 115, 22, 0.08);
-    border-color: rgba(249, 115, 22, 0.3); color: var(--top-color);
+    background: color-mix(in srgb, var(--top-color) 12%, transparent);
+    border-color: color-mix(in srgb, var(--top-color) 40%, transparent);
+    color: var(--top-color);
   }
   .game-pip.bot-home {
-    background: rgba(6, 182, 212, 0.08);
-    border-color: rgba(6, 182, 212, 0.3); color: var(--bot-color);
+    background: color-mix(in srgb, var(--bot-color) 12%, transparent);
+    border-color: color-mix(in srgb, var(--bot-color) 40%, transparent);
+    color: var(--bot-color);
   }
   .game-pip.played { opacity: 0.4; }
   .game-pip.next { box-shadow: 0 0 0 2px var(--accent); }
@@ -482,12 +501,13 @@
   .bracket-team {
     display: flex; justify-content: space-between; align-items: center;
     font-family: var(--display); font-size: 13px; font-weight: 500;
+    color: var(--cell-team-color, var(--text-primary));
   }
-  .bracket-team.winner { color: var(--positive); font-weight: 700; }
+  .bracket-team.winner { color: var(--cell-team-color, var(--positive)); font-weight: 700; }
   .bracket-team.eliminated { color: var(--text-disabled); text-decoration: line-through; }
   .bracket-team-score {
     font-family: var(--mono); font-size: 14px; font-weight: 600;
-    color: var(--accent-bright);
+    color: var(--cell-team-color, var(--accent-bright));
   }
   .bracket-spacer { flex: 1; }
 
@@ -542,6 +562,7 @@
   </div>
 </div>
 
+<script src="teams.js"></script>
 <script src="playoffs.js"></script>
 <script src="engine.js"></script>
 <script>
@@ -601,6 +622,7 @@
   // ===== RENDER: series tabs =====
   function renderSeriesTabs() {
     const el = document.getElementById('seriesTabs');
+    el.dataset.round = activeRound;
     el.innerHTML = '';
     const rd = ROUND_DEFS.find(r => r.id === activeRound);
     const ids = rd.getSeriesIds();
@@ -616,11 +638,8 @@
       const bot = s.botSeed.short || s.botSeed.name || 'TBD';
       const score = s.state.topWins + '-' + s.state.botWins;
       tab.innerHTML = `
-        <div class="series-tab-teams">
-          <span>${top} vs ${bot}</span>
-          <span class="series-tab-score">${score}</span>
-        </div>
-        <div class="series-tab-meta">${s.label}</div>
+        <div class="series-tab-teams">${top} vs ${bot}</div>
+        <div class="series-tab-score">${score}</div>
       `;
       tab.addEventListener('click', () => {
         if (isSeriesTBD(s)) return;
@@ -665,12 +684,16 @@
                          isSeriesComplete(s) ? 'eliminated' : '';
         const botClass = isSeriesComplete(s) && s.state.botWins >= 4 ? 'winner' :
                          isSeriesComplete(s) ? 'eliminated' : '';
+        const topTeamColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.topSeed.short])
+          ? NHL_TEAMS[s.topSeed.short].home.primary : 'var(--text-primary)';
+        const botTeamColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.botSeed.short])
+          ? NHL_TEAMS[s.botSeed.short].home.primary : 'var(--text-primary)';
         cell.innerHTML = `
-          <div class="bracket-team ${topClass}">
+          <div class="bracket-team ${topClass}" style="${topClass === 'eliminated' ? '' : '--cell-team-color:' + topTeamColor + ';'}">
             <span>${top}</span>
             <span class="bracket-team-score">${s.state.topWins}</span>
           </div>
-          <div class="bracket-team ${botClass}">
+          <div class="bracket-team ${botClass}" style="${botClass === 'eliminated' ? '' : '--cell-team-color:' + botTeamColor + ';'}">
             <span>${bot}</span>
             <span class="bracket-team-score">${s.state.botWins}</span>
           </div>
@@ -715,7 +738,21 @@
       ${renderEndedBanner(s)}
       ${renderMarkets(s)}
     `;
+    applyTeamColors(s);
     wireControls(s);
+  }
+
+  // Apply each team's home colors as CSS custom properties.
+  function applyTeamColors(s) {
+    const root = document.documentElement;
+    const top = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[s.topSeed.short] : null;
+    const bot = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[s.botSeed.short] : null;
+    root.style.setProperty('--top-color', top ? top.home.primary : '#f97316');
+    root.style.setProperty('--top-color-secondary', top ? top.home.secondary : '#ffffff');
+    root.style.setProperty('--top-color-away', top ? top.away.primary : '#f97316');
+    root.style.setProperty('--bot-color', bot ? bot.home.primary : '#06b6d4');
+    root.style.setProperty('--bot-color-secondary', bot ? bot.home.secondary : '#ffffff');
+    root.style.setProperty('--bot-color-away', bot ? bot.away.primary : '#06b6d4');
   }
 
   // ===== RENDER: controls =====
@@ -746,17 +783,17 @@
           </div>
         </div>
         <div class="control-group">
-          <label>Bottom Seed (Home: G3, G4, G6)</label>
-          <div class="team-input">
-            <span class="team-dot bot"></span>
-            <input type="text" id="botName" value="${escapeHtml(s.botSeed.name)}">
-          </div>
-        </div>
-        <div class="control-group">
           <label>Top Seed Home Win %</label>
           <div class="slider-row">
             <input type="range" id="topHomeWin" min="0" max="100" step="0.5" value="${s.auto.topHomeWinPct * 100}">
             <div class="slider-value" id="topHomeWinValue">${(s.auto.topHomeWinPct * 100).toFixed(1)}%</div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Bottom Seed (Home: G3, G4, G6)</label>
+          <div class="team-input">
+            <span class="team-dot bot"></span>
+            <input type="text" id="botName" value="${escapeHtml(s.botSeed.name)}">
           </div>
         </div>
         <div class="control-group">
@@ -805,7 +842,7 @@
       `;
     }
     return `
-      <div class="controls-grid" style="margin-bottom: 16px;">
+      <div class="controls-grid" style="margin-bottom: 16px; grid-template-columns: 1fr; max-width: 50%;">
         <div class="control-group">
           <label>Top Seed</label>
           <div class="team-input">
@@ -864,10 +901,10 @@
         <div class="state-actions">
           <button class="undo" id="undoBtn" ${undoCount === 0 ? 'disabled' : ''}>← Undo</button>
           <button class="win-top" id="topWinBtn" ${ended ? 'disabled' : ''}>
-            <span class="team-dot top"></span> Top Wins
+            <span class="team-dot top"></span> ${escapeHtml(s.topSeed.short || 'TOP')} Wins Game ${ended ? '' : nextGame}
           </button>
           <button class="win-bot" id="botWinBtn" ${ended ? 'disabled' : ''}>
-            <span class="team-dot bot"></span> Bottom Wins
+            <span class="team-dot bot"></span> ${escapeHtml(s.botSeed.short || 'BOT')} Wins Game ${ended ? '' : nextGame}
           </button>
           <button class="reset" id="resetBtn">⟲ Reset</button>
         </div>

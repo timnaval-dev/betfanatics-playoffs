@@ -145,12 +145,13 @@
 
   /* ROUND TABS */
   .round-tabs {
-    display: flex; gap: 4px; margin-bottom: 16px;
+    display: flex; justify-content: center; gap: 4px; margin-bottom: 16px;
     background: var(--bg-secondary); border: 1px solid var(--border);
     border-radius: 10px; padding: 4px;
+    flex-wrap: wrap;
   }
   .round-tab {
-    flex: 1; padding: 10px 16px; text-align: center; cursor: pointer;
+    padding: 10px 28px; text-align: center; cursor: pointer;
     border-radius: 7px; font-family: var(--display); font-size: 14px;
     font-weight: 600; color: var(--text-tertiary);
     transition: all 0.15s; background: transparent; border: none;
@@ -165,13 +166,21 @@
   /* SERIES TABS */
   .series-tabs {
     display: grid; gap: 8px; margin-bottom: 24px;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .series-tabs[data-round="round1"] { grid-template-columns: repeat(4, 1fr); }
+  .series-tabs[data-round="round2"] { grid-template-columns: repeat(2, 1fr); }
+  .series-tabs[data-round="round3"] { grid-template-columns: 1fr; max-width: 320px; margin-left: auto; margin-right: auto; }
+  .series-tabs[data-round="round4"] { grid-template-columns: 1fr; max-width: 320px; margin-left: auto; margin-right: auto; }
+  @media (max-width: 700px) {
+    .series-tabs[data-round="round1"] { grid-template-columns: repeat(2, 1fr); }
+    .series-tabs[data-round="round2"] { grid-template-columns: 1fr; }
   }
   .series-tab {
     background: var(--bg-secondary); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 12px; cursor: pointer;
-    transition: all 0.15s; text-align: left; font-family: var(--body);
-    color: var(--text-primary); display: flex; flex-direction: column; gap: 4px;
+    border-radius: 10px; padding: 14px 12px; cursor: pointer;
+    transition: all 0.15s; font-family: var(--body);
+    color: var(--text-primary);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
     position: relative;
   }
   .series-tab:hover { border-color: var(--accent); }
@@ -180,7 +189,7 @@
     box-shadow: 0 0 0 1px var(--accent);
   }
   .series-tab.modified::after {
-    content: ''; position: absolute; top: 6px; right: 6px;
+    content: ''; position: absolute; top: 8px; right: 8px;
     width: 8px; height: 8px; border-radius: 50%; background: var(--warn);
   }
   .series-tab.complete {
@@ -188,16 +197,21 @@
     background: linear-gradient(135deg, rgba(52, 211, 153, 0.05), transparent);
   }
   .series-tab-teams {
-    display: flex; align-items: center; justify-content: space-between;
-    font-family: var(--display); font-size: 13px; font-weight: 600;
+    font-family: var(--display); font-size: 14px; font-weight: 600;
+    text-align: center; line-height: 1.2;
   }
   .series-tab-score {
-    font-family: var(--mono); font-size: 16px; font-weight: 600;
+    font-family: var(--mono); font-size: 18px; font-weight: 600;
     color: var(--accent-bright);
+    padding: 3px 14px; border-radius: 6px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid var(--accent-dim);
+    letter-spacing: 0.04em;
   }
-  .series-tab-meta {
-    font-size: 10px; color: var(--text-tertiary);
-    text-transform: uppercase; letter-spacing: 0.06em;
+  .series-tab.complete .series-tab-score {
+    color: var(--positive);
+    background: rgba(52, 211, 153, 0.1);
+    border-color: var(--positive);
   }
 
   /* PANELS */
@@ -217,8 +231,16 @@
   .mode-toggle button { padding: 6px 12px; font-size: 12px; }
 
   .grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    display: grid; grid-template-columns: repeat(2, 1fr);
     gap: 18px;
+  }
+  .identity-grid {
+    display: grid; grid-template-columns: 2fr 1fr;
+    gap: 14px 18px;
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+    .identity-grid { grid-template-columns: 1fr; }
   }
   .control-group label {
     display: block; font-family: var(--mono); font-size: 10px;
@@ -266,8 +288,8 @@
     gap: 6px;
   }
   .manual-game.played { opacity: 0.5; }
-  .manual-game.played.top-won { border-color: rgba(249, 115, 22, 0.4); }
-  .manual-game.played.bot-won { border-color: rgba(6, 182, 212, 0.4); }
+  .manual-game.played.top-won { border-color: color-mix(in srgb, var(--top-color) 50%, transparent); }
+  .manual-game.played.bot-won { border-color: color-mix(in srgb, var(--bot-color) 50%, transparent); }
   .manual-game-label {
     font-family: var(--mono); font-size: 9px; font-weight: 500;
     color: var(--text-tertiary); text-transform: uppercase;
@@ -293,7 +315,7 @@
   .state-display { display: flex; align-items: center; gap: 22px; }
   .state-team {
     display: flex; flex-direction: column; align-items: center;
-    gap: 6px; min-width: 110px;
+    gap: 6px; min-width: 140px; max-width: 170px;
   }
   .state-team-name {
     font-family: var(--display); font-size: 12px; font-weight: 600;
@@ -332,8 +354,8 @@
     font-size: 10px; font-weight: 600; border: 1px solid var(--border);
     background: var(--bg-tertiary); color: var(--text-tertiary);
   }
-  .game-pip.top-home { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); color: var(--top-color); }
-  .game-pip.bot-home { background: rgba(6, 182, 212, 0.08); border-color: rgba(6, 182, 212, 0.3); color: var(--bot-color); }
+  .game-pip.top-home { background: color-mix(in srgb, var(--top-color) 12%, transparent); border-color: color-mix(in srgb, var(--top-color) 40%, transparent); color: var(--top-color); }
+  .game-pip.bot-home { background: color-mix(in srgb, var(--bot-color) 12%, transparent); border-color: color-mix(in srgb, var(--bot-color) 40%, transparent); color: var(--bot-color); }
   .game-pip.played { opacity: 0.4; }
   .game-pip.next { box-shadow: 0 0 0 2px var(--accent); }
 
@@ -341,8 +363,11 @@
 
   /* MARGIN OVERRIDE GRID */
   .margin-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 800px) {
+    .margin-grid { grid-template-columns: repeat(2, 1fr); }
   }
   .margin-cell label {
     font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
@@ -460,6 +485,7 @@
   </div>
 </div>
 
+<script src="teams.js"></script>
 <script src="playoffs.js"></script>
 <script src="engine.js"></script>
 <script>
@@ -524,6 +550,7 @@
 
   function renderSeriesTabs() {
     const el = document.getElementById('seriesTabs');
+    el.dataset.round = activeRound;
     el.innerHTML = '';
     const rd = ROUND_DEFS.find(r => r.id === activeRound);
     const modIds = getModifiedSeriesIds();
@@ -538,11 +565,8 @@
       const bot = s.botSeed.short || s.botSeed.name || 'TBD';
       const score = s.state.topWins + '-' + s.state.botWins;
       tab.innerHTML = `
-        <div class="series-tab-teams">
-          <span>${top} vs ${bot}</span>
-          <span class="series-tab-score">${score}</span>
-        </div>
-        <div class="series-tab-meta">${s.label}</div>
+        <div class="series-tab-teams">${top} vs ${bot}</div>
+        <div class="series-tab-score">${score}</div>
       `;
       tab.addEventListener('click', () => {
         activeSeriesId = id;
@@ -593,7 +617,22 @@
     html += renderMarginPanel(s);
 
     el.innerHTML = html;
+    applyTeamColors(s);
     wireMain(s);
+  }
+
+  // Apply each team's home colors as CSS custom properties on the document root.
+  // Falls back to the original orange/cyan if a team isn't in the NHL_TEAMS database.
+  function applyTeamColors(s) {
+    const root = document.documentElement;
+    const top = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[s.topSeed.short] : null;
+    const bot = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[s.botSeed.short] : null;
+    root.style.setProperty('--top-color', top ? top.home.primary : '#f97316');
+    root.style.setProperty('--top-color-secondary', top ? top.home.secondary : '#ffffff');
+    root.style.setProperty('--top-color-away', top ? top.away.primary : '#f97316');
+    root.style.setProperty('--bot-color', bot ? bot.home.primary : '#06b6d4');
+    root.style.setProperty('--bot-color-secondary', bot ? bot.home.secondary : '#ffffff');
+    root.style.setProperty('--bot-color-away', bot ? bot.away.primary : '#06b6d4');
   }
 
   function renderPromotePanel(s) {
@@ -640,8 +679,8 @@
   function renderIdentityPanel(s) {
     return `
       <div class="panel">
-        <div class="panel-header"><div class="panel-title">${escapeHtml(s.label)} — Identity</div></div>
-        <div class="grid">
+        <div class="panel-header"><div class="panel-title">Series Identity</div></div>
+        <div class="identity-grid">
           <div class="control-group">
             <label>Top Seed Name</label>
             <div class="team-input">
@@ -687,7 +726,7 @@
 
   function renderAutoInputs(s) {
     return `
-      <div class="grid">
+      <div class="grid" style="grid-template-columns: 1fr;">
         <div class="control-group">
           <label>Top Seed Home Win % (G1, G2, G5, G7)</label>
           <div class="slider-row">
@@ -784,10 +823,10 @@
           <div class="state-actions">
             <button class="undo" id="undoBtn" ${(s.state.history && s.state.history.length <= 1) ? 'disabled' : ''}>← Undo Last Game</button>
             <button class="win-top" id="topWinBtn" ${ended ? 'disabled' : ''}>
-              <span class="team-dot top"></span> Top Wins Game ${ended ? '' : nextGame}
+              <span class="team-dot top"></span> ${escapeHtml(s.topSeed.short || 'TOP')} Wins Game ${ended ? '' : nextGame}
             </button>
             <button class="win-bot" id="botWinBtn" ${ended ? 'disabled' : ''}>
-              <span class="team-dot bot"></span> Bottom Wins Game ${ended ? '' : nextGame}
+              <span class="team-dot bot"></span> ${escapeHtml(s.botSeed.short || 'BOT')} Wins Game ${ended ? '' : nextGame}
             </button>
             <button class="danger" id="resetBtn">⟲ Reset to 0-0</button>
           </div>
