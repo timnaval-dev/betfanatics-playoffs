@@ -249,7 +249,13 @@ const PLAYOFFS_DATA = {
   }
 };
 
-// Export for both browser global and Node.js require()
+// Attach to window so other script tags can access it.
+// (Top-level `const` does not auto-attach to window in browsers.)
+if (typeof window !== 'undefined') {
+  window.PLAYOFFS_DATA = PLAYOFFS_DATA;
+}
+
+// Export for Node.js require()
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = PLAYOFFS_DATA;
 }
