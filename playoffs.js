@@ -250,8 +250,33 @@ const PLAYOFFS_DATA = {
       afterG4: 0.06,
       fromBehindNeverTrail: 0.06,
       conferenceWinner: 0.10,
-      stanleyCupWinner: 0.15
+      stanleyCupWinner: 0.15,
+      // Round-based outright margins. Round = highest-numbered series with both
+      // teams populated in the relevant scope (East/West conference for conf markets,
+      // bracket-wide max for SCF). Values shrink as uncertainty drops.
+      outrightSchedule: {
+        1: { conference: 0.10,  stanleyCup: 0.16  },
+        2: { conference: 0.08,  stanleyCup: 0.12  },
+        3: { conference: 0.045, stanleyCup: 0.08  },
+        4: { conference: 0.045, stanleyCup: 0.045 }
+      }
     }
+  },
+
+  // Per-team probability deltas (in percentage points, e.g. -0.05 = subtract 5%).
+  // Net delta gets redistributed equally across unbiased teams in the same market.
+  outrightBiases: {
+    eastConf: {},
+    westConf: {},
+    scf: {}
+  },
+
+  // Optional market blending. When enabled with both books pasted, model fair probs
+  // are blended with the de-vigged FD+DK average using marketWeight (default 0.7 = 70% market).
+  outrightBlend: {
+    eastConf: { enabled: false, marketWeight: 0.7, fanDuelText: "", draftKingsText: "", fanDuelProbs: {}, draftKingsProbs: {} },
+    westConf: { enabled: false, marketWeight: 0.7, fanDuelText: "", draftKingsText: "", fanDuelProbs: {}, draftKingsProbs: {} },
+    scf:      { enabled: false, marketWeight: 0.7, fanDuelText: "", draftKingsText: "", fanDuelProbs: {}, draftKingsProbs: {} }
   }
 };
 

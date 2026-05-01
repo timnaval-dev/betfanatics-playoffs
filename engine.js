@@ -429,6 +429,187 @@
   // by their probabilities. Series winner probabilities use derived per-game probs (power
   // scores) when both teams are known. Current series state (topWins/botWins) is honored
   // when the slotted matchup matches an enumerated pair.
+  // -------- Outrights helpers: market parsing, de-vig, blending, biases, round --------
+
+  // Parse a pasted block of "Team Name +odds" or "Team Name\n+odds" into
+  // { teamShort: rawImpliedProb (with vig) }. Lines that don't match are skipped.
+  // Section headers like "Eastern Conference Winner" are also skipped.
+  function parseOddsList(text, teamsTable) {
+    if (!text || !text.trim()) return { parsed: {}, unmatched: [] };
+    const teams = teamsTable || (global.NHL_TEAMS || {});
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const parsed = {};
+    const unmatched = [];
+    let pendingName = null;
+
+    const SKIP_PATTERNS = /conference winner|stanley cup|see (less|more)|odds to win|^team$|2024\/25|2025\/26|^to win$|^[\^v⌃ˇ]$/i;
+
+    function matchTeamShort(name) {
+      const lc = name.toLowerCase().trim();
+      // Exact match on full name
+      for (const [s, t] of Object.entries(teams)) {
+        if (t.name && t.name.toLowerCase() === lc) return s;
+      }
+      // Last-word match (e.g., "Hurricanes" → CAR)
+      for (const [s, t] of Object.entries(teams)) {
+        if (!t.name) continue;
+        const lastWord = t.name.split(' ').pop().toLowerCase();
+        if (lc === lastWord || lc.endsWith(' ' + lastWord) || lc.endsWith(lastWord)) return s;
+      }
+      // Contains match (city or nickname inside)
+      for (const [s, t] of Object.entries(teams)) {
+        if (!t.name) continue;
+        const tName = t.name.toLowerCase();
+        if (tName.includes(lc) || lc.includes(tName)) return s;
+      }
+      // Short code match
+      const upper = name.toUpperCase().replace(/[^A-Z]/g, '');
+      if (teams[upper]) return upper;
+      return null;
+    }
+
+    for (const line of lines) {
+      if (SKIP_PATTERNS.test(line)) { pendingName = null; continue; }
+
+      // Inline format: "Team Name +odds" or "Team Name -odds"
+      const inline = line.match(/^(.+?)[\s\t]+([+-]\d+)$/);
+      if (inline) {
+        const short = matchTeamShort(inline[1].trim());
+        const american = parseInt(inline[2], 10);
+        if (short) parsed[short] = americanToProb(american);
+        else unmatched.push(inline[1].trim());
+        pendingName = null;
+        continue;
+      }
+
+      // Just odds on a line — pair with previous team name
+      if (/^[+-]?\d+$/.test(line)) {
+        if (pendingName) {
+          const short = matchTeamShort(pendingName);
+          const american = parseInt(line, 10);
+          if (short) parsed[short] = americanToProb(american);
+          else unmatched.push(pendingName);
+        }
+        pendingName = null;
+        continue;
+      }
+
+      // Not odds, not header — assume team name awaiting odds
+      pendingName = line;
+    }
+
+    return { parsed, unmatched };
+  }
+
+  // De-vig a probability map: divides each by sum so total = 1.
+  function devig(probs) {
+    const sum = Object.values(probs).reduce((a, b) => a + b, 0);
+    if (sum <= 0) return { ...probs };
+    const out = {};
+    for (const [k, v] of Object.entries(probs)) out[k] = v / sum;
+    return out;
+  }
+
+  // Average two de-vigged probability maps. If a team is in only one, use that value.
+  // Renormalizes the result.
+  function averageMarkets(fdDv, dkDv) {
+    const all = new Set([...Object.keys(fdDv || {}), ...Object.keys(dkDv || {})]);
+    const result = {};
+    for (const k of all) {
+      const a = (fdDv && fdDv[k] != null) ? fdDv[k] : null;
+      const b = (dkDv && dkDv[k] != null) ? dkDv[k] : null;
+      if (a != null && b != null) result[k] = (a + b) / 2;
+      else if (a != null) result[k] = a;
+      else if (b != null) result[k] = b;
+    }
+    return devig(result);
+  }
+
+  // Blend model probs with market probs: blended = (1-mw) * model + mw * market.
+  // Renormalizes to keep total = 1. If marketProbs is empty, returns model unchanged.
+  function blendModelAndMarket(modelProbs, marketProbs, marketWeight) {
+    if (!marketProbs || Object.keys(marketProbs).length === 0) return { ...modelProbs };
+    const mw = clamp01(marketWeight);
+    const all = new Set([...Object.keys(modelProbs), ...Object.keys(marketProbs)]);
+    const out = {};
+    for (const k of all) {
+      const m = modelProbs[k] || 0;
+      const x = marketProbs[k] || 0;
+      out[k] = (1 - mw) * m + mw * x;
+    }
+    return devig(out);
+  }
+
+  // Apply per-team probability biases (in percentage points, e.g. -0.05 = -5%).
+  // Net delta is redistributed equally across unbiased teams. Floors at 0, then renorms.
+  function applyOutrightBiases(probs, biases) {
+    if (!biases || Object.keys(biases).length === 0) return { ...probs };
+    const teams = Object.keys(probs);
+    const biasedSet = new Set(Object.keys(biases).filter(k => Math.abs(biases[k] || 0) > 1e-9 && teams.includes(k)));
+    if (biasedSet.size === 0) return { ...probs };
+
+    const unbiased = teams.filter(k => !biasedSet.has(k));
+    let netBias = 0;
+    biasedSet.forEach(k => { netBias += biases[k] || 0; });
+
+    const out = { ...probs };
+    biasedSet.forEach(k => { out[k] = Math.max(0, out[k] + (biases[k] || 0)); });
+
+    if (unbiased.length > 0) {
+      const perTeam = -netBias / unbiased.length;
+      unbiased.forEach(k => { out[k] = Math.max(0, out[k] + perTeam); });
+    }
+
+    return devig(out);
+  }
+
+  // Determine the "round" that a market is currently in, based on which series have
+  // both teams populated. East/West conference markets follow their conference's
+  // progress; SCF follows the bracket-wide max round.
+  function computeMarketRound(workingData, scope) {
+    const series = workingData.series;
+    const bracket = workingData.bracket;
+    let ids;
+    if (scope === 'east') {
+      ids = [...bracket.east.r1, ...bracket.east.r2, bracket.east.r3];
+    } else if (scope === 'west') {
+      ids = [...bracket.west.r1, ...bracket.west.r2, bracket.west.r3];
+    } else {
+      ids = [
+        ...bracket.east.r1, ...bracket.east.r2, bracket.east.r3,
+        ...bracket.west.r1, ...bracket.west.r2, bracket.west.r3,
+        bracket.final
+      ];
+    }
+    const roundOf = (id) => {
+      if (id === bracket.final) return 4;
+      if (/(^|-)e3|w3/i.test(id)) return 3;
+      if (/(^|-)e2|w2/i.test(id)) return 2;
+      return 1;
+    };
+    let maxRound = 1;
+    for (const id of ids) {
+      const s = series[id];
+      if (s && s.topSeed && s.topSeed.short && s.botSeed && s.botSeed.short) {
+        maxRound = Math.max(maxRound, roundOf(id));
+      }
+    }
+    return maxRound;
+  }
+
+  // Look up the configured outright margin for a given round + market type.
+  function getOutrightMargin(workingData, round, marketType) {
+    const sched = workingData.defaults &&
+                  workingData.defaults.margin &&
+                  workingData.defaults.margin.outrightSchedule;
+    if (sched && sched[round] && typeof sched[round][marketType] === 'number') {
+      return sched[round][marketType];
+    }
+    // Fallback to legacy single-margin defaults
+    if (marketType === 'conference') return (workingData.defaults.margin && workingData.defaults.margin.conferenceWinner) || 0.10;
+    return (workingData.defaults.margin && workingData.defaults.margin.stanleyCupWinner) || 0.16;
+  }
+
   function computeOutrights(workingData) {
     const conn = workingData.bracketConnections;
     const series = workingData.series;
@@ -524,33 +705,87 @@
     const eastConfId = workingData.bracket.east.r3;
     const westConfId = workingData.bracket.west.r3;
     const scfId = workingData.bracket.final;
-    const eastConfWinners = computeWinnerDist(eastConfId);
-    const westConfWinners = computeWinnerDist(westConfId);
-    const cupWinners = computeWinnerDist(scfId);
+    const eastConfWinnersModel = computeWinnerDist(eastConfId);
+    const westConfWinnersModel = computeWinnerDist(westConfId);
+    const cupWinnersModel = computeWinnerDist(scfId);
 
-    // Build teams array — one row per R1 team
+    // ===== PIPELINE: model fair → market blend → bias → margin =====
+
+    // 1. Model fair (already de-vigged since computeWinnerDist returns probabilities summing to 1)
+    const modelEastFair = { ...eastConfWinnersModel };
+    const modelWestFair = { ...westConfWinnersModel };
+    const modelScfFair  = { ...cupWinnersModel };
+
+    // 2. Market blend (if active for this market)
+    const blend = workingData.outrightBlend || {};
+    function getMarketAvg(blendCfg) {
+      if (!blendCfg || !blendCfg.enabled) return null;
+      const fdRaw = blendCfg.fanDuelProbs || {};
+      const dkRaw = blendCfg.draftKingsProbs || {};
+      const haveFD = Object.keys(fdRaw).length > 0;
+      const haveDK = Object.keys(dkRaw).length > 0;
+      if (!haveFD && !haveDK) return null;
+      // De-vig each book independently, then average
+      const fdDv = haveFD ? devig(fdRaw) : {};
+      const dkDv = haveDK ? devig(dkRaw) : {};
+      return averageMarkets(fdDv, dkDv);
+    }
+    const eastMarketAvg = getMarketAvg(blend.eastConf);
+    const westMarketAvg = getMarketAvg(blend.westConf);
+    const scfMarketAvg  = getMarketAvg(blend.scf);
+
+    const eastMW = (blend.eastConf && typeof blend.eastConf.marketWeight === 'number') ? blend.eastConf.marketWeight : 0.7;
+    const westMW = (blend.westConf && typeof blend.westConf.marketWeight === 'number') ? blend.westConf.marketWeight : 0.7;
+    const scfMW  = (blend.scf      && typeof blend.scf.marketWeight === 'number')      ? blend.scf.marketWeight      : 0.7;
+
+    const blendedEast = eastMarketAvg ? blendModelAndMarket(modelEastFair, eastMarketAvg, eastMW) : { ...modelEastFair };
+    const blendedWest = westMarketAvg ? blendModelAndMarket(modelWestFair, westMarketAvg, westMW) : { ...modelWestFair };
+    const blendedScf  = scfMarketAvg  ? blendModelAndMarket(modelScfFair,  scfMarketAvg,  scfMW)  : { ...modelScfFair };
+
+    // 3. Apply liability biases
+    const biases = workingData.outrightBiases || {};
+    const finalEastFair = applyOutrightBiases(blendedEast, biases.eastConf || {});
+    const finalWestFair = applyOutrightBiases(blendedWest, biases.westConf || {});
+    const finalScfFair  = applyOutrightBiases(blendedScf,  biases.scf || {});
+
+    // 4. Build teams array
     const teams = [];
     const r1Ids = [...workingData.bracket.east.r1, ...workingData.bracket.west.r1];
     r1Ids.forEach(r1Id => {
       const r1 = series[r1Id];
       [r1.topSeed, r1.botSeed].forEach(seed => {
         if (!seed.short) return;
-        const confDist = r1.conference === 'East' ? eastConfWinners : westConfWinners;
+        const isEast = r1.conference === 'East';
+        const confFair  = isEast ? finalEastFair : finalWestFair;
+        const confModel = isEast ? modelEastFair : modelWestFair;
+        const confMarket = isEast ? eastMarketAvg : westMarketAvg;
+        const confBiases = isEast ? (biases.eastConf || {}) : (biases.westConf || {});
         teams.push({
           short: seed.short,
           name: seed.name,
           conference: r1.conference,
           r1SeriesId: r1Id,
-          fairWinConference: confDist[seed.short] || 0,
-          fairWinStanleyCup: cupWinners[seed.short] || 0
+          // Final fair (after blend + bias) drives the offered odds
+          fairWinConference: confFair[seed.short] || 0,
+          fairWinStanleyCup: finalScfFair[seed.short] || 0,
+          // Diagnostic fields for transparency in the UI
+          modelFairConference: confModel[seed.short] || 0,
+          modelFairStanleyCup: modelScfFair[seed.short] || 0,
+          marketFairConference: confMarket ? (confMarket[seed.short] || 0) : null,
+          marketFairStanleyCup: scfMarketAvg ? (scfMarketAvg[seed.short] || 0) : null,
+          biasConference: confBiases[seed.short] || 0,
+          biasStanleyCup: (biases.scf || {})[seed.short] || 0
         });
       });
     });
 
-    // Apply margins
-    const marginEastConf = (defaults.margin && defaults.margin.conferenceWinner) || 0.10;
-    const marginWestConf = (defaults.margin && defaults.margin.conferenceWinner) || 0.10;
-    const marginSCF      = (defaults.margin && defaults.margin.stanleyCupWinner) || 0.15;
+    // 5. Round-based margins
+    const eastRound = computeMarketRound(workingData, 'east');
+    const westRound = computeMarketRound(workingData, 'west');
+    const scfRound  = computeMarketRound(workingData, 'all');
+    const marginEastConf = getOutrightMargin(workingData, eastRound, 'conference');
+    const marginWestConf = getOutrightMargin(workingData, westRound, 'conference');
+    const marginSCF      = getOutrightMargin(workingData, scfRound,  'stanleyCup');
 
     const eastTeams = teams.filter(t => t.conference === 'East');
     const westTeams = teams.filter(t => t.conference === 'West');
@@ -581,7 +816,10 @@
       allTeamsByCup: teams.slice().sort((a, b) => b.fairWinStanleyCup - a.fairWinStanleyCup),
       eastConfMargin,
       westConfMargin,
-      scfMargin
+      scfMargin,
+      // Diagnostic / display info
+      eastRound, westRound, scfRound,
+      eastMarketAvg, westMarketAvg, scfMarketAvg
     };
   }
 
@@ -603,6 +841,13 @@
     resolveMargin,
     computeMarkets,
     computeOutrights,
+    parseOddsList,
+    devig,
+    averageMarkets,
+    blendModelAndMarket,
+    applyOutrightBiases,
+    computeMarketRound,
+    getOutrightMargin,
     marginBadgeColor,
     fmtMargin,
     fmtPct,

@@ -388,6 +388,88 @@
     font-size: 12px; color: var(--text-tertiary);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .outright-team-stack { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+  .outright-team-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .outright-team-diag {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+    margin-left: 0; opacity: 0.85;
+  }
+  .bias-badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; line-height: 1;
+  }
+  .bias-badge.pos { background: rgba(34, 197, 94, 0.15); color: rgb(74, 222, 128); }
+  .bias-badge.neg { background: rgba(239, 68, 68, 0.15); color: rgb(248, 113, 113); }
+
+  /* BLEND CONTROLS */
+  .blend-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .blend-card {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .blend-card.active {
+    border-color: var(--accent-bright);
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2);
+  }
+  .blend-header { display: flex; align-items: center; justify-content: space-between; }
+  .blend-title {
+    font-family: var(--display); font-weight: 600; font-size: 13px;
+    color: var(--text-primary); letter-spacing: -0.01em;
+  }
+  .blend-status {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 3px 7px; border-radius: 3px; letter-spacing: 0.05em;
+  }
+  .blend-status.on { background: rgba(34, 197, 94, 0.15); color: rgb(74, 222, 128); }
+  .blend-status.off { background: var(--bg-tertiary); color: var(--text-tertiary); }
+  .blend-paste-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  @media (max-width: 540px) { .blend-paste-grid { grid-template-columns: 1fr; } }
+  .blend-paste { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .blend-paste label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-tertiary); display: flex; align-items: center; justify-content: space-between;
+  }
+  .parse-count.ok {
+    font-family: var(--mono); color: rgb(74, 222, 128); font-size: 10px;
+    text-transform: none; letter-spacing: 0;
+  }
+  .blend-textarea {
+    width: 100%; min-height: 90px; max-height: 200px; resize: vertical;
+    background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px; font-family: var(--mono); font-size: 11px;
+    color: var(--text-primary); line-height: 1.4;
+  }
+  .blend-textarea:focus { outline: none; border-color: var(--accent-bright); }
+  .blend-controls-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding-top: 4px; border-top: 1px solid var(--border);
+  }
+  .blend-weight-label {
+    font-size: 11px; color: var(--text-secondary); min-width: 200px;
+  }
+  .blend-weight-label strong { color: var(--text-primary); font-family: var(--mono); }
+  .blend-weight-slider { flex: 1; min-width: 120px; }
+  .blend-actions { display: flex; gap: 6px; }
+  .btn-recalc, .btn-clear {
+    padding: 6px 12px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border); border-radius: 5px; cursor: pointer;
+    font-family: var(--display); letter-spacing: 0.02em;
+    transition: all 0.15s;
+  }
+  .btn-recalc {
+    background: var(--accent); color: white; border-color: var(--accent-bright);
+  }
+  .btn-recalc:hover:not(:disabled) { background: var(--accent-bright); }
+  .btn-recalc:disabled { opacity: 0.4; cursor: not-allowed; background: var(--bg-tertiary); color: var(--text-tertiary); border-color: var(--border); }
+  .btn-clear {
+    background: transparent; color: var(--text-secondary);
+  }
+  .btn-clear:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 
   /* DERIVED MODE PANEL */
   .derived-panel { display: flex; flex-direction: column; gap: 14px; }
@@ -843,6 +925,7 @@
     // Outrights view (futures markets)
     if (rd && rd.isOutrights) {
       el.innerHTML = renderOutrightsView();
+      wireOutrightControls();
       return;
     }
 
@@ -1147,8 +1230,10 @@
   // ===== RENDER: outrights / futures view =====
   function renderOutrightsView() {
     const o = E.computeOutrights(workingData);
+    const blend = workingData.outrightBlend || {};
+    const biases = workingData.outrightBiases || {};
 
-    const renderTeamRow = (team, probField, offeredField) => {
+    const renderTeamRow = (team, probField, offeredField, biasField, modelField, marketField) => {
       const fair = team[probField];
       const offered = team[offeredField];
       const dec = E.probToDecimal(offered);
@@ -1157,12 +1242,32 @@
       const muted = fair < 0.001 ? 'muted' : '';
       const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[team.short] : null;
       const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
+      const bias = team[biasField] || 0;
+      const modelVal = team[modelField];
+      const marketVal = team[marketField];
+
+      // Diagnostic line under team name (small text)
+      const diagParts = [];
+      if (modelVal != null) diagParts.push('model ' + (modelVal * 100).toFixed(1) + '%');
+      if (marketVal != null && marketVal > 0) diagParts.push('market ' + (marketVal * 100).toFixed(1) + '%');
+      const diagText = diagParts.length > 0 ? diagParts.join(' · ') : '';
+
+      const biasBadge = bias !== 0
+        ? `<span class="bias-badge ${bias > 0 ? 'pos' : 'neg'}">${bias > 0 ? '+' : ''}${(bias * 100).toFixed(1)}%</span>`
+        : '';
+
       return `
         <div class="row ${muted}" style="--row-team-color:${accent};">
           <div class="row-label outright-team">
             <span class="outright-team-dot" style="background:${accent};"></span>
-            <span class="outright-team-short">${escapeHtml(team.short)}</span>
-            <span class="outright-team-name">${escapeHtml(team.name)}</span>
+            <div class="outright-team-stack">
+              <div class="outright-team-line">
+                <span class="outright-team-short">${escapeHtml(team.short)}</span>
+                <span class="outright-team-name">${escapeHtml(team.name)}</span>
+                ${biasBadge}
+              </div>
+              ${diagText ? `<div class="outright-team-diag">${diagText}</div>` : ''}
+            </div>
           </div>
           <div class="row-prob">${E.fmtPct(fair)}</div>
           <div class="row-decimal">${E.fmtDecimal(dec)}</div>
@@ -1171,13 +1276,13 @@
       `;
     };
 
-    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, totalMargin, wide) => {
-      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField)).join('');
+    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, biasField, modelField, marketField, totalMargin, round, wide) => {
+      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField, biasField, modelField, marketField)).join('');
       return `
         <div class="market ${wide ? 'wide' : ''}">
           <div class="market-header">
             <div class="market-title">${title}</div>
-            <div class="market-tag">${subtitle}</div>
+            <div class="market-tag">R${round} · ${subtitle}</div>
           </div>
           <div class="col-headers"><span>Team</span><span>Prob</span><span>Dec</span><span>US</span></div>
           <div class="market-body">${rowsHtml}</div>
@@ -1189,20 +1294,132 @@
       `;
     };
 
+    // ----- Blend control card (per market) -----
+    const renderBlendControl = (key, label) => {
+      const cfg = blend[key] || { enabled: false, marketWeight: 0.7, fanDuelText: '', draftKingsText: '' };
+      const fdText = cfg.fanDuelText || '';
+      const dkText = cfg.draftKingsText || '';
+      const fdCount = Object.keys(cfg.fanDuelProbs || {}).length;
+      const dkCount = Object.keys(cfg.draftKingsProbs || {}).length;
+      const mw = (typeof cfg.marketWeight === 'number') ? cfg.marketWeight : 0.7;
+      const canApply = fdText.trim().length > 0 && dkText.trim().length > 0;
+      const isActive = cfg.enabled && fdCount > 0 && dkCount > 0;
+
+      return `
+        <div class="blend-card ${isActive ? 'active' : ''}">
+          <div class="blend-header">
+            <div class="blend-title">${label}</div>
+            <div class="blend-status ${isActive ? 'on' : 'off'}">${isActive ? 'BLENDING' : 'MODEL ONLY'}</div>
+          </div>
+          <div class="blend-paste-grid">
+            <div class="blend-paste">
+              <label>FanDuel paste ${fdCount > 0 ? `<span class="parse-count ok">${fdCount} matched</span>` : ''}</label>
+              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="fanDuel" placeholder="Paste FanDuel odds here&#10;e.g.&#10;Carolina Hurricanes  +105&#10;Buffalo Sabres  +450">${escapeHtml(fdText)}</textarea>
+            </div>
+            <div class="blend-paste">
+              <label>DraftKings paste ${dkCount > 0 ? `<span class="parse-count ok">${dkCount} matched</span>` : ''}</label>
+              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="draftKings" placeholder="Paste DraftKings odds here">${escapeHtml(dkText)}</textarea>
+            </div>
+          </div>
+          <div class="blend-controls-row">
+            <label class="blend-weight-label">Market weight: <strong id="mw-${key}">${(mw * 100).toFixed(0)}%</strong> (model: ${((1 - mw) * 100).toFixed(0)}%)</label>
+            <input type="range" min="0" max="100" step="5" value="${mw * 100}" data-blend-weight="${key}" class="blend-weight-slider">
+            <div class="blend-actions">
+              <button class="btn-recalc" data-blend-action="apply" data-blend-market="${key}" ${canApply ? '' : 'disabled'}>Recalculate</button>
+              <button class="btn-clear" data-blend-action="clear" data-blend-market="${key}">Clear</button>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
     return `
       <div class="outrights-banner">
         <div class="outrights-banner-title">Outright / Futures Markets</div>
         <div class="outrights-banner-desc">
-          Conference and Stanley Cup winner odds, computed from each team's bracket path.
-          Updates dynamically as you adjust series settings.
+          Conference and Stanley Cup winner odds. Margins step down by round automatically
+          (R1: 10%/16% · R2: 8%/12% · R3: 4.5%/8% · R4: 4.5%). Paste FanDuel + DraftKings
+          odds below to blend market prices into the model. Active biases from admin show
+          as badges next to teams.
         </div>
       </div>
+
+      <div class="blend-grid">
+        ${renderBlendControl('eastConf', 'East Conference Blend')}
+        ${renderBlendControl('westConf', 'West Conference Blend')}
+        ${renderBlendControl('scf', 'Stanley Cup Blend')}
+      </div>
+
       <div class="markets-grid">
-        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', o.eastConfMargin)}
-        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', o.westConfMargin)}
-        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', o.scfMargin, true)}
+        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.eastConfMargin, o.eastRound)}
+        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.westConfMargin, o.westRound)}
+        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', 'modelFairStanleyCup', 'marketFairStanleyCup', o.scfMargin, o.scfRound, true)}
       </div>
     `;
+  }
+
+  // Wire up the blend controls inside the outrights view (call after each render)
+  function wireOutrightControls() {
+    document.querySelectorAll('.blend-textarea').forEach(ta => {
+      ta.addEventListener('input', e => {
+        const market = e.target.dataset.blendMarket;
+        const book = e.target.dataset.blendBook;
+        if (!workingData.outrightBlend) workingData.outrightBlend = {};
+        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
+        const cfg = workingData.outrightBlend[market];
+        if (book === 'fanDuel') cfg.fanDuelText = e.target.value;
+        else cfg.draftKingsText = e.target.value;
+        // Enable Recalculate button when both have content
+        const card = e.target.closest('.blend-card');
+        const recalcBtn = card.querySelector('[data-blend-action="apply"]');
+        const fdHas = (cfg.fanDuelText || '').trim().length > 0;
+        const dkHas = (cfg.draftKingsText || '').trim().length > 0;
+        recalcBtn.disabled = !(fdHas && dkHas);
+      });
+    });
+
+    document.querySelectorAll('.blend-weight-slider').forEach(sl => {
+      sl.addEventListener('input', e => {
+        const market = e.target.dataset.blendWeight;
+        const mw = parseFloat(e.target.value) / 100;
+        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
+        workingData.outrightBlend[market].marketWeight = mw;
+        const lbl = document.getElementById('mw-' + market);
+        if (lbl) lbl.textContent = (mw * 100).toFixed(0) + '%';
+        // If blend already active, re-render to reflect new weight
+        if (workingData.outrightBlend[market].enabled) {
+          renderMain();
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-blend-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const action = btn.dataset.blendAction;
+        const market = btn.dataset.blendMarket;
+        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
+        const cfg = workingData.outrightBlend[market];
+        if (action === 'apply') {
+          const fdR = E.parseOddsList(cfg.fanDuelText || '');
+          const dkR = E.parseOddsList(cfg.draftKingsText || '');
+          cfg.fanDuelProbs = fdR.parsed;
+          cfg.draftKingsProbs = dkR.parsed;
+          cfg.enabled = (Object.keys(fdR.parsed).length > 0 && Object.keys(dkR.parsed).length > 0);
+          const totalUnmatched = (fdR.unmatched || []).length + (dkR.unmatched || []).length;
+          if (totalUnmatched > 0) {
+            const allUnmatched = [...(fdR.unmatched || []), ...(dkR.unmatched || [])];
+            alert('Blend applied. ' + Object.keys(fdR.parsed).length + ' FD teams + ' + Object.keys(dkR.parsed).length + ' DK teams matched.\n\nUnmatched lines:\n' + allUnmatched.join('\n'));
+          }
+        } else if (action === 'clear') {
+          cfg.enabled = false;
+          cfg.fanDuelText = '';
+          cfg.draftKingsText = '';
+          cfg.fanDuelProbs = {};
+          cfg.draftKingsProbs = {};
+        }
+        renderMain();
+      });
+    });
   }
 
   function renderRow(leg) {
