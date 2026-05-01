@@ -420,19 +420,8 @@
 </head>
 <body>
 
-<!-- Password Gate -->
-<div id="gateScreen" class="gate">
-  <div class="gate-card">
-    <h2>Admin Access</h2>
-    <p>Enter password to edit live config.</p>
-    <input type="password" id="gateInput" placeholder="Password" autofocus>
-    <button class="primary" id="gateSubmit" style="width: 100%; justify-content: center;">Unlock</button>
-    <div class="gate-error" id="gateError"></div>
-  </div>
-</div>
-
-<!-- Main App (hidden until unlocked) -->
-<div class="app" id="appScreen" style="display:none;">
+<!-- Main App -->
+<div class="app">
   <header class="header">
     <div>
       <h1>NHL Playoffs <span class="accent">Admin</span></h1>
@@ -440,7 +429,6 @@
     </div>
     <div class="header-right">
       <button id="exportBtn" class="primary">Export new playoffs.js</button>
-      <button id="lockBtn">Lock</button>
     </div>
   </header>
 
@@ -491,40 +479,8 @@
     { id: 'round4', label: 'Stanley Cup Final', getSeriesIds: () => [workingData.bracket.final] }
   ];
 
-  // ===== GATE =====
-  function checkGate() {
-    if (sessionStorage.getItem('admin_unlocked') === 'yes') {
-      showApp();
-    }
-  }
-  function showApp() {
-    document.getElementById('gateScreen').style.display = 'none';
-    document.getElementById('appScreen').style.display = '';
-    renderAll();
-  }
-  function lock() {
-    sessionStorage.removeItem('admin_unlocked');
-    document.getElementById('appScreen').style.display = 'none';
-    document.getElementById('gateScreen').style.display = '';
-    document.getElementById('gateInput').value = '';
-    document.getElementById('gateInput').focus();
-  }
-  function tryUnlock() {
-    const input = document.getElementById('gateInput').value;
-    if (input === PASSWORD) {
-      sessionStorage.setItem('admin_unlocked', 'yes');
-      showApp();
-    } else {
-      document.getElementById('gateError').textContent = 'Incorrect password';
-    }
-  }
-
-  document.getElementById('gateSubmit').addEventListener('click', tryUnlock);
-  document.getElementById('gateInput').addEventListener('keypress', e => {
-    if (e.key === 'Enter') tryUnlock();
-  });
-  document.getElementById('lockBtn').addEventListener('click', lock);
-  checkGate();
+  // Render immediately on load — no password gate.
+  // (Gate code removed entirely.)
 
   // ===== MODIFIED TRACKING =====
   function getModifiedSeriesIds() {
@@ -1070,6 +1026,8 @@ if (typeof module !== 'undefined' && module.exports) {
     renderMain();
     renderModifiedBanner();
   }
+
+  renderAll();
 })();
 </script>
 
