@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NHL Playoffs Admin — BetFanatics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0a0b;
+    --bg-secondary: #131316;
+    --bg-tertiary: #1a1a1e;
+    --bg-elevated: #1f1f24;
+    --border: #2a2a31;
+    --border-light: #3a3a42;
+    --text-primary: #f5f5f4;
+    --text-secondary: #a0a0a8;
+    --text-tertiary: #6b6b74;
+    --text-disabled: #4a4a52;
+    --accent: #8b5cf6;
+    --accent-bright: #a78bfa;
+    --accent-dim: #5b21b6;
+    --top-color: #f97316;
+    --bot-color: #06b6d4;
+    --positive: #34d399;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --display: 'Bricolage Grotesque', system-ui, sans-serif;
+    --body: 'Geist', system-ui, sans-serif;
+    --mono: 'Geist Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--body);
+    font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      radial-gradient(at 20% 0%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
+      radial-gradient(at 80% 100%, rgba(248, 113, 113, 0.04) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  .app { max-width: 1500px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  /* PASSWORD GATE */
+  .gate {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column;
+  }
+  .gate-card {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; max-width: 400px; width: 100%;
+    text-align: center;
+  }
+  .gate-card h2 {
+    font-family: var(--display); font-weight: 700; font-size: 24px;
+    margin-bottom: 8px; color: var(--text-primary);
+  }
+  .gate-card p {
+    color: var(--text-tertiary); font-size: 13px; margin-bottom: 20px;
+  }
+  .gate-card input {
+    width: 100%; padding: 12px 14px; margin-bottom: 12px;
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); border-radius: 8px;
+    font-family: var(--body); font-size: 15px;
+  }
+  .gate-card input:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .gate-error {
+    color: var(--danger); font-size: 12px; margin-top: 8px;
+    font-family: var(--mono);
+  }
+
+  /* HEADER */
+  .header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 24px;
+    flex-wrap: wrap; gap: 16px;
+  }
+  .header h1 {
+    font-family: var(--display); font-weight: 700; font-size: 32px;
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .header h1 .accent { color: var(--danger); }
+  .header .subtitle {
+    color: var(--text-tertiary); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; margin-top: 6px; font-weight: 500;
+  }
+  .header-right { display: flex; gap: 12px; align-items: center; }
+
+  /* MODIFIED BANNER */
+  .modified-banner {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05));
+    border: 1px solid var(--warn); border-radius: 10px;
+    padding: 14px 20px; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+  }
+  .modified-banner-text {
+    font-family: var(--display); font-weight: 600; color: var(--warn);
+    font-size: 15px;
+  }
+  .modified-banner-actions { display: flex; gap: 8px; }
+
+  button {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 9px 14px; border-radius: 8px;
+    font-family: var(--body); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover:not(:disabled) {
+    border-color: var(--border-light); background: var(--bg-tertiary);
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary {
+    background: var(--accent-dim); border-color: var(--accent);
+    color: var(--text-primary);
+  }
+  button.primary:hover { background: var(--accent); }
+  button.toggle.active {
+    background: var(--accent-dim); border-color: var(--accent);
+    color: var(--text-primary);
+  }
+  button.warn {
+    background: rgba(251, 191, 36, 0.15); border-color: var(--warn);
+    color: var(--warn);
+  }
+  button.warn:hover { background: rgba(251, 191, 36, 0.25); }
+  button.danger {
+    background: rgba(248, 113, 113, 0.15); border-color: var(--danger);
+    color: var(--danger);
+  }
+  button.danger:hover { background: rgba(248, 113, 113, 0.25); }
+
+  /* ROUND TABS */
+  .round-tabs {
+    display: flex; gap: 4px; margin-bottom: 16px;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 10px; padding: 4px;
+  }
+  .round-tab {
+    flex: 1; padding: 10px 16px; text-align: center; cursor: pointer;
+    border-radius: 7px; font-family: var(--display); font-size: 14px;
+    font-weight: 600; color: var(--text-tertiary);
+    transition: all 0.15s; background: transparent; border: none;
+    letter-spacing: -0.01em;
+  }
+  .round-tab:hover { color: var(--text-primary); }
+  .round-tab.active {
+    background: var(--bg-elevated); color: var(--accent-bright);
+    box-shadow: 0 0 0 1px var(--accent-dim);
+  }
+
+  /* SERIES TABS */
+  .series-tabs {
+    display: grid; gap: 8px; margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .series-tab {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; cursor: pointer;
+    transition: all 0.15s; text-align: left; font-family: var(--body);
+    color: var(--text-primary); display: flex; flex-direction: column; gap: 4px;
+    position: relative;
+  }
+  .series-tab:hover { border-color: var(--accent); }
+  .series-tab.active {
+    background: var(--bg-elevated); border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .series-tab.modified::after {
+    content: ''; position: absolute; top: 6px; right: 6px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--warn);
+  }
+  .series-tab.complete {
+    border-color: var(--positive);
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.05), transparent);
+  }
+  .series-tab-teams {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--display); font-size: 13px; font-weight: 600;
+  }
+  .series-tab-score {
+    font-family: var(--mono); font-size: 16px; font-weight: 600;
+    color: var(--accent-bright);
+  }
+  .series-tab-meta {
+    font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  /* PANELS */
+  .panel {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-family: var(--display); font-size: 14px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: -0.01em;
+  }
+  .mode-toggle { display: flex; gap: 6px; }
+  .mode-toggle button { padding: 6px 12px; font-size: 12px; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+  }
+  .control-group label {
+    display: block; font-family: var(--mono); font-size: 10px;
+    font-weight: 500; color: var(--text-tertiary); letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .team-input { display: flex; align-items: center; gap: 10px; }
+  .team-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .team-dot.top { background: var(--top-color); }
+  .team-dot.bot { background: var(--bot-color); }
+  input[type="text"], input[type="number"] {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); padding: 9px 12px; border-radius: 7px;
+    font-family: var(--body); font-size: 14px; font-weight: 500; width: 100%;
+    transition: all 0.15s;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    outline: none; border-color: var(--accent); background: var(--bg-elevated);
+  }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-value {
+    font-family: var(--mono); font-size: 14px; font-weight: 600;
+    color: var(--text-primary); min-width: 56px; text-align: right;
+  }
+  input[type="range"] {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+    background: var(--bg-tertiary); border-radius: 2px; outline: none;
+    border: 1px solid var(--border);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    background: var(--accent-bright); border: 2px solid var(--bg-primary);
+    border-radius: 50%; cursor: pointer;
+  }
+
+  /* MANUAL GAME GRID */
+  .manual-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;
+  }
+  .manual-game {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 8px; display: flex; flex-direction: column;
+    gap: 6px;
+  }
+  .manual-game.played { opacity: 0.5; }
+  .manual-game.played.top-won { border-color: rgba(249, 115, 22, 0.4); }
+  .manual-game.played.bot-won { border-color: rgba(6, 182, 212, 0.4); }
+  .manual-game-label {
+    font-family: var(--mono); font-size: 9px; font-weight: 500;
+    color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.06em; display: flex; justify-content: space-between;
+  }
+  .manual-game-home { font-size: 9px; }
+  .manual-game-home.top { color: var(--top-color); }
+  .manual-game-home.bot { color: var(--bot-color); }
+  .manual-game input {
+    text-align: center; padding: 6px; font-size: 13px;
+  }
+  .manual-game-implied {
+    font-family: var(--mono); font-size: 10px; color: var(--text-secondary);
+    text-align: center;
+  }
+  .manual-game-result {
+    font-family: var(--mono); font-size: 9px; font-weight: 600; text-align: center;
+  }
+  .manual-game-result.top-won { color: var(--top-color); }
+  .manual-game-result.bot-won { color: var(--bot-color); }
+
+  /* STATE PANEL */
+  .state-display { display: flex; align-items: center; gap: 22px; }
+  .state-team {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; min-width: 110px;
+  }
+  .state-team-name {
+    font-family: var(--display); font-size: 12px; font-weight: 600;
+    color: var(--text-secondary); letter-spacing: -0.01em; text-align: center;
+  }
+  .state-wins {
+    font-family: var(--display); font-size: 56px; font-weight: 700;
+    line-height: 1; letter-spacing: -0.04em;
+  }
+  .state-team.top .state-wins { color: var(--top-color); }
+  .state-team.bot .state-wins { color: var(--bot-color); }
+  .state-divider {
+    color: var(--text-tertiary); font-family: var(--display);
+    font-size: 40px; font-weight: 300;
+  }
+  .state-meta {
+    display: flex; flex-direction: column; gap: 4px; font-family: var(--mono);
+    font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .state-meta strong {
+    color: var(--text-primary); font-weight: 500; font-size: 11px;
+  }
+  .state-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.win-top:hover:not(:disabled) {
+    border-color: var(--top-color); color: var(--top-color);
+  }
+  button.win-bot:hover:not(:disabled) {
+    border-color: var(--bot-color); color: var(--bot-color);
+  }
+
+  .schedule { display: flex; gap: 4px; margin-top: 8px; }
+  .game-pip {
+    width: 26px; height: 26px; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; font-family: var(--mono);
+    font-size: 10px; font-weight: 600; border: 1px solid var(--border);
+    background: var(--bg-tertiary); color: var(--text-tertiary);
+  }
+  .game-pip.top-home { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); color: var(--top-color); }
+  .game-pip.bot-home { background: rgba(6, 182, 212, 0.08); border-color: rgba(6, 182, 212, 0.3); color: var(--bot-color); }
+  .game-pip.played { opacity: 0.4; }
+  .game-pip.next { box-shadow: 0 0 0 2px var(--accent); }
+
+  .panel-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  /* MARGIN OVERRIDE GRID */
+  .margin-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .margin-cell label {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+    display: block; margin-bottom: 4px;
+  }
+  .margin-cell input {
+    padding: 6px 8px; font-size: 13px; text-align: center;
+    font-family: var(--mono);
+  }
+
+  /* PROMOTE PANEL */
+  .promote-panel {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.1), rgba(52, 211, 153, 0.02));
+    border: 1px solid var(--positive); border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 16px;
+  }
+  .promote-panel-title {
+    font-family: var(--display); font-weight: 600; font-size: 14px;
+    color: var(--positive); margin-bottom: 4px;
+  }
+  .promote-panel-desc {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;
+  }
+  .promote-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* EXPORT MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; max-width: 700px; width: 100%;
+    max-height: 80vh; display: flex; flex-direction: column;
+  }
+  .modal h2 {
+    font-family: var(--display); font-size: 22px; font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .modal p {
+    color: var(--text-tertiary); font-size: 13px; margin-bottom: 16px;
+  }
+  .modal textarea {
+    flex: 1; min-height: 300px; background: var(--bg-tertiary);
+    border: 1px solid var(--border); color: var(--text-primary);
+    padding: 12px; border-radius: 8px; font-family: var(--mono);
+    font-size: 11px; line-height: 1.4; resize: vertical;
+  }
+  .modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
+  }
+  .copy-confirm {
+    color: var(--positive); font-family: var(--mono); font-size: 11px;
+    margin-right: auto; align-self: center;
+  }
+
+  /* TBD BANNER */
+  .tbd-banner {
+    background: var(--bg-secondary); border: 1px dashed var(--border);
+    border-radius: 12px; padding: 32px; text-align: center;
+    color: var(--text-tertiary); margin-bottom: 16px;
+  }
+  .tbd-banner h2 {
+    font-family: var(--display); font-size: 20px; font-weight: 600;
+    color: var(--text-secondary); margin-bottom: 8px;
+  }
+
+  @media (max-width: 700px) {
+    .header h1 { font-size: 26px; }
+    .state-wins { font-size: 44px; }
+    .manual-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="gateScreen" class="gate">
+  <div class="gate-card">
+    <h2>Admin Access</h2>
+    <p>Enter password to edit live config.</p>
+    <input type="password" id="gateInput" placeholder="Password" autofocus>
+    <button class="primary" id="gateSubmit" style="width: 100%; justify-content: center;">Unlock</button>
+    <div class="gate-error" id="gateError"></div>
+  </div>
+</div>
+
+<!-- Main App (hidden until unlocked) -->
+<div class="app" id="appScreen" style="display:none;">
+  <header class="header">
+    <div>
+      <h1>NHL Playoffs <span class="accent">Admin</span></h1>
+      <div class="subtitle">Edit Live Config · Promote Winners · Export</div>
+    </div>
+    <div class="header-right">
+      <button id="exportBtn" class="primary">Export new playoffs.js</button>
+      <button id="lockBtn">Lock</button>
+    </div>
+  </header>
+
+  <div class="modified-banner" id="modifiedBanner" style="display:none;">
+    <div class="modified-banner-text" id="modifiedText"></div>
+    <div class="modified-banner-actions">
+      <button id="discardBtn" class="warn">Discard Changes</button>
+      <button id="exportBtn2" class="primary">Export</button>
+    </div>
+  </div>
+
+  <div class="round-tabs" id="roundTabs"></div>
+  <div class="series-tabs" id="seriesTabs"></div>
+  <div id="mainContent"></div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal" style="display:none;">
+  <div class="modal">
+    <h2>Export playoffs.js</h2>
+    <p>Replace <code>playoffs.js</code> in your GitHub repo with this content. Use Download to save the file, or Copy to paste into the GitHub web editor.</p>
+    <textarea id="exportContent" readonly></textarea>
+    <div class="modal-actions">
+      <span class="copy-confirm" id="copyConfirm" style="display:none;">✓ Copied to clipboard</span>
+      <button id="downloadBtn">Download .js File</button>
+      <button id="copyBtn" class="primary">Copy to Clipboard</button>
+      <button id="closeModalBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="playoffs.js"></script>
+<script src="engine.js"></script>
+<script>
+(function () {
+  const E = window.PlayoffsEngine;
+  const ORIGINAL = JSON.parse(JSON.stringify(window.PLAYOFFS_DATA));
+  const PASSWORD = 'Tech';
+
+  let workingData = JSON.parse(JSON.stringify(ORIGINAL));
+  let activeRound = 'round1';
+  let activeSeriesId = workingData.bracket.east.r1[0];
+
+  const ROUND_DEFS = [
+    { id: 'round1', label: 'Round 1', getSeriesIds: () => [...workingData.bracket.east.r1, ...workingData.bracket.west.r1] },
+    { id: 'round2', label: 'Round 2', getSeriesIds: () => [...workingData.bracket.east.r2, ...workingData.bracket.west.r2] },
+    { id: 'round3', label: 'Conference Finals', getSeriesIds: () => [workingData.bracket.east.r3, workingData.bracket.west.r3] },
+    { id: 'round4', label: 'Stanley Cup Final', getSeriesIds: () => [workingData.bracket.final] }
+  ];
+
+  // ===== GATE =====
+  function checkGate() {
+    if (sessionStorage.getItem('admin_unlocked') === 'yes') {
+      showApp();
+    }
+  }
+  function showApp() {
+    document.getElementById('gateScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = '';
+    renderAll();
+  }
+  function lock() {
+    sessionStorage.removeItem('admin_unlocked');
+    document.getElementById('appScreen').style.display = 'none';
+    document.getElementById('gateScreen').style.display = '';
+    document.getElementById('gateInput').value = '';
+    document.getElementById('gateInput').focus();
+  }
+  function tryUnlock() {
+    const input = document.getElementById('gateInput').value;
+    if (input === PASSWORD) {
+      sessionStorage.setItem('admin_unlocked', 'yes');
+      showApp();
+    } else {
+      document.getElementById('gateError').textContent = 'Incorrect password';
+    }
+  }
+
+  document.getElementById('gateSubmit').addEventListener('click', tryUnlock);
+  document.getElementById('gateInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') tryUnlock();
+  });
+  document.getElementById('lockBtn').addEventListener('click', lock);
+  checkGate();
+
+  // ===== MODIFIED TRACKING =====
+  function getModifiedSeriesIds() {
+    const ids = [];
+    Object.keys(workingData.series).forEach(id => {
+      if (JSON.stringify(workingData.series[id]) !== JSON.stringify(ORIGINAL.series[id])) {
+        ids.push(id);
+      }
+    });
+    return ids;
+  }
+
+  function isSeriesTBD(s) {
+    return !s.topSeed.name || !s.botSeed.name;
+  }
+  function isSeriesComplete(s) {
+    return s.state.topWins >= 4 || s.state.botWins >= 4;
+  }
+  function getActiveSeries() {
+    return workingData.series[activeSeriesId];
+  }
+
+  // ===== RENDER =====
+  function renderRoundTabs() {
+    const el = document.getElementById('roundTabs');
+    el.innerHTML = '';
+    ROUND_DEFS.forEach(rd => {
+      const btn = document.createElement('button');
+      btn.className = 'round-tab' + (rd.id === activeRound ? ' active' : '');
+      btn.textContent = rd.label;
+      btn.addEventListener('click', () => {
+        activeRound = rd.id;
+        const ids2 = rd.getSeriesIds();
+        const first = ids2.find(id => !isSeriesTBD(workingData.series[id])) || ids2[0];
+        activeSeriesId = first;
+        renderAll();
+      });
+      el.appendChild(btn);
+    });
+  }
+
+  function renderSeriesTabs() {
+    const el = document.getElementById('seriesTabs');
+    el.innerHTML = '';
+    const rd = ROUND_DEFS.find(r => r.id === activeRound);
+    const modIds = getModifiedSeriesIds();
+    rd.getSeriesIds().forEach(id => {
+      const s = workingData.series[id];
+      const tab = document.createElement('button');
+      tab.className = 'series-tab';
+      if (id === activeSeriesId) tab.classList.add('active');
+      if (modIds.includes(id)) tab.classList.add('modified');
+      if (isSeriesComplete(s)) tab.classList.add('complete');
+      const top = s.topSeed.short || s.topSeed.name || 'TBD';
+      const bot = s.botSeed.short || s.botSeed.name || 'TBD';
+      const score = s.state.topWins + '-' + s.state.botWins;
+      tab.innerHTML = `
+        <div class="series-tab-teams">
+          <span>${top} vs ${bot}</span>
+          <span class="series-tab-score">${score}</span>
+        </div>
+        <div class="series-tab-meta">${s.label}</div>
+      `;
+      tab.addEventListener('click', () => {
+        activeSeriesId = id;
+        renderAll();
+      });
+      el.appendChild(tab);
+    });
+  }
+
+  function renderModifiedBanner() {
+    const banner = document.getElementById('modifiedBanner');
+    const ids = getModifiedSeriesIds();
+    if (ids.length === 0) {
+      banner.style.display = 'none';
+      return;
+    }
+    banner.style.display = '';
+    document.getElementById('modifiedText').textContent =
+      `${ids.length} series modified — export to apply changes`;
+  }
+
+  function renderMain() {
+    const el = document.getElementById('mainContent');
+    const s = getActiveSeries();
+
+    let html = '';
+
+    // Promote winner panel (for R2/R3/SCF where parent series is complete)
+    html += renderPromotePanel(s);
+
+    // TBD banner if applicable
+    if (isSeriesTBD(s)) {
+      html += `
+        <div class="tbd-banner">
+          <h2>This series is TBD</h2>
+          <p>Use the Promote Winner panel above (if available) or set teams manually below.</p>
+        </div>
+      `;
+    }
+
+    // Series identity
+    html += renderIdentityPanel(s);
+    // Mode + odds
+    html += renderInputsPanel(s);
+    // State stepper
+    html += renderStatePanel(s);
+    // Margin overrides
+    html += renderMarginPanel(s);
+
+    el.innerHTML = html;
+    wireMain(s);
+  }
+
+  function renderPromotePanel(s) {
+    // Check if this series has a bracketConnection (R2+, conf, scf)
+    const conn = workingData.bracketConnections[activeSeriesId];
+    if (!conn) return '';
+    const topParent = workingData.series[conn.topFrom];
+    const botParent = workingData.series[conn.botFrom];
+    const topComplete = isSeriesComplete(topParent);
+    const botComplete = isSeriesComplete(botParent);
+    if (!topComplete && !botComplete) return '';
+    const topWinner = topComplete ? (topParent.state.topWins >= 4 ? topParent.topSeed : topParent.botSeed) : null;
+    const botWinner = botComplete ? (botParent.state.topWins >= 4 ? botParent.topSeed : botParent.botSeed) : null;
+
+    const currentTopName = s.topSeed.name;
+    const currentBotName = s.botSeed.name;
+
+    let actions = '';
+    if (topWinner) {
+      const isPlaced = currentTopName === topWinner.name || currentBotName === topWinner.name;
+      if (!isPlaced) {
+        actions += `<button class="primary" data-promote="topToTop" data-team="${escapeAttr(topWinner.name)}" data-short="${escapeAttr(topWinner.short)}">Place ${escapeHtml(topWinner.name)} as Top Seed</button>`;
+        actions += `<button data-promote="topToBot" data-team="${escapeAttr(topWinner.name)}" data-short="${escapeAttr(topWinner.short)}">Place ${escapeHtml(topWinner.name)} as Bottom Seed</button>`;
+      }
+    }
+    if (botWinner) {
+      const isPlaced = currentTopName === botWinner.name || currentBotName === botWinner.name;
+      if (!isPlaced) {
+        actions += `<button class="primary" data-promote="botToBot" data-team="${escapeAttr(botWinner.name)}" data-short="${escapeAttr(botWinner.short)}">Place ${escapeHtml(botWinner.name)} as Bottom Seed</button>`;
+        actions += `<button data-promote="botToTop" data-team="${escapeAttr(botWinner.name)}" data-short="${escapeAttr(botWinner.short)}">Place ${escapeHtml(botWinner.name)} as Top Seed</button>`;
+      }
+    }
+    if (!actions) return '';
+
+    return `
+      <div class="promote-panel">
+        <div class="promote-panel-title">Bracket Advance Available</div>
+        <div class="promote-panel-desc">A prior series has settled. Choose where the winner slots into this series.</div>
+        <div class="promote-actions">${actions}</div>
+      </div>
+    `;
+  }
+
+  function renderIdentityPanel(s) {
+    return `
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">${escapeHtml(s.label)} — Identity</div></div>
+        <div class="grid">
+          <div class="control-group">
+            <label>Top Seed Name</label>
+            <div class="team-input">
+              <span class="team-dot top"></span>
+              <input type="text" id="topName" value="${escapeAttr(s.topSeed.name)}">
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Top Seed Short Code</label>
+            <input type="text" id="topShort" value="${escapeAttr(s.topSeed.short)}" placeholder="3-letter abbr.">
+          </div>
+          <div class="control-group">
+            <label>Bottom Seed Name</label>
+            <div class="team-input">
+              <span class="team-dot bot"></span>
+              <input type="text" id="botName" value="${escapeAttr(s.botSeed.name)}">
+            </div>
+          </div>
+          <div class="control-group">
+            <label>Bottom Seed Short Code</label>
+            <input type="text" id="botShort" value="${escapeAttr(s.botSeed.short)}" placeholder="3-letter abbr.">
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderInputsPanel(s) {
+    const isManual = s.mode === 'manual';
+    return `
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Pricing Inputs</div>
+          <div class="mode-toggle">
+            <button class="toggle ${!isManual ? 'active' : ''}" data-mode="auto">Auto Sliders</button>
+            <button class="toggle ${isManual ? 'active' : ''}" data-mode="manual">Manual Per-Game</button>
+          </div>
+        </div>
+        ${isManual ? renderManualInputs(s) : renderAutoInputs(s)}
+      </div>
+    `;
+  }
+
+  function renderAutoInputs(s) {
+    return `
+      <div class="grid">
+        <div class="control-group">
+          <label>Top Seed Home Win % (G1, G2, G5, G7)</label>
+          <div class="slider-row">
+            <input type="range" id="topHomeWin" min="0" max="100" step="0.5" value="${s.auto.topHomeWinPct * 100}">
+            <div class="slider-value" id="topHomeWinValue">${(s.auto.topHomeWinPct * 100).toFixed(1)}%</div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Bottom Seed Home Win % (G3, G4, G6)</label>
+          <div class="slider-row">
+            <input type="range" id="botHomeWin" min="0" max="100" step="0.5" value="${s.auto.botHomeWinPct * 100}">
+            <div class="slider-value" id="botHomeWinValue">${(s.auto.botHomeWinPct * 100).toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderManualInputs(s) {
+    const totalPlayed = s.state.topWins + s.state.botWins;
+    let gamesHtml = '';
+    for (let g = 1; g <= 7; g++) {
+      const isHome = E.isTopHome(g);
+      const homeClass = isHome ? 'top' : 'bot';
+      const homeLabel = isHome ? (s.topSeed.short || 'TOP') : (s.botSeed.short || 'BOT');
+      const played = g <= totalPlayed;
+      const stateBefore = E.stateAfterGame(s, g - 1);
+      const stateAfter = E.stateAfterGame(s, g);
+      let resultClass = '', resultText = '';
+      if (played && stateBefore && stateAfter) {
+        if (stateAfter[0] > stateBefore[0]) {
+          resultClass = 'top-won';
+          resultText = (s.topSeed.short || 'TOP') + ' WON';
+        } else {
+          resultClass = 'bot-won';
+          resultText = (s.botSeed.short || 'BOT') + ' WON';
+        }
+      }
+      const prob = s.manual['game' + g];
+      const american = E.probToAmerican(prob);
+      gamesHtml += `
+        <div class="manual-game ${played ? 'played ' + resultClass : ''}">
+          <div class="manual-game-label">
+            <span>G${g}</span>
+            <span class="manual-game-home ${homeClass}">${homeLabel} home</span>
+          </div>
+          <input type="text" data-game="${g}" class="manual-input" value="${american}" ${played ? 'disabled' : ''}>
+          <div class="manual-game-implied">${(prob * 100).toFixed(1)}% top</div>
+          ${played ? `<div class="manual-game-result ${resultClass}">${resultText}</div>` : ''}
+        </div>
+      `;
+    }
+    return `
+      <div class="control-group">
+        <label>Per-Game Top Seed Win Odds (American format, e.g. -150 or +120)</label>
+        <div class="manual-grid">${gamesHtml}</div>
+      </div>
+    `;
+  }
+
+  function renderStatePanel(s) {
+    const totalPlayed = s.state.topWins + s.state.botWins;
+    const ended = isSeriesComplete(s);
+    const nextGame = ended ? null : totalPlayed + 1;
+
+    let scheduleHtml = '';
+    for (let g = 1; g <= 7; g++) {
+      const home = E.isTopHome(g) ? 'top-home' : 'bot-home';
+      const played = g <= totalPlayed ? 'played' : '';
+      const next = g === nextGame ? 'next' : '';
+      scheduleHtml += `<div class="game-pip ${home} ${played} ${next}">${g}</div>`;
+    }
+
+    return `
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Series State</div></div>
+        <div class="panel-row">
+          <div class="state-display">
+            <div class="state-team top">
+              <div class="state-team-name">${escapeHtml(s.topSeed.name) || 'Top'}</div>
+              <div class="state-wins">${s.state.topWins}</div>
+            </div>
+            <div class="state-divider">·</div>
+            <div class="state-team bot">
+              <div class="state-team-name">${escapeHtml(s.botSeed.name) || 'Bot'}</div>
+              <div class="state-wins">${s.state.botWins}</div>
+            </div>
+            <div class="state-meta">
+              <div>Game <strong>${ended ? '—' : nextGame}</strong> next</div>
+              <div>Home: <strong>${ended ? '—' : (E.isTopHome(nextGame) ? (s.topSeed.name || 'Top') : (s.botSeed.name || 'Bot'))}</strong></div>
+              <div class="schedule">${scheduleHtml}</div>
+            </div>
+          </div>
+          <div class="state-actions">
+            <button class="undo" id="undoBtn" ${(s.state.history && s.state.history.length <= 1) ? 'disabled' : ''}>← Undo Last Game</button>
+            <button class="win-top" id="topWinBtn" ${ended ? 'disabled' : ''}>
+              <span class="team-dot top"></span> Top Wins Game ${ended ? '' : nextGame}
+            </button>
+            <button class="win-bot" id="botWinBtn" ${ended ? 'disabled' : ''}>
+              <span class="team-dot bot"></span> Bottom Wins Game ${ended ? '' : nextGame}
+            </button>
+            <button class="danger" id="resetBtn">⟲ Reset to 0-0</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMarginPanel(s) {
+    const marketKeys = [
+      ['seriesWinner', 'Series Winner'],
+      ['correctScore', 'Correct Score'],
+      ['totalGamesOU', 'Totals O/U'],
+      ['totalGamesExact', 'Exact Games'],
+      ['spreads', 'Spreads'],
+      ['afterG3', 'After Game 3'],
+      ['afterG4', 'After Game 4'],
+      ['fromBehindNeverTrail', 'From Behind / NT']
+    ];
+    let cellsHtml = '';
+    marketKeys.forEach(([key, label]) => {
+      const seriesVal = s.margin && s.margin[key];
+      const defaultVal = workingData.defaults.margin[key];
+      const val = (typeof seriesVal === 'number') ? (seriesVal * 100).toFixed(1) : '';
+      cellsHtml += `
+        <div class="margin-cell">
+          <label>${label} (default ${(defaultVal * 100).toFixed(1)}%)</label>
+          <input type="text" data-margin="${key}" value="${val}" placeholder="${(defaultVal * 100).toFixed(1)}">
+        </div>
+      `;
+    });
+    return `
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Margin Overrides (% — leave blank for default)</div></div>
+        <div class="margin-grid">${cellsHtml}</div>
+      </div>
+    `;
+  }
+
+  // ===== WIRE =====
+  function wireMain(s) {
+    // Promote
+    document.querySelectorAll('[data-promote]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.promote;
+        const team = btn.dataset.team;
+        const short = btn.dataset.short;
+        if (action === 'topToTop' || action === 'botToTop') {
+          s.topSeed = { name: team, short: short };
+        } else if (action === 'topToBot' || action === 'botToBot') {
+          s.botSeed = { name: team, short: short };
+        }
+        renderAll();
+      });
+    });
+
+    // Identity
+    const wireText = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', e => { fn(e.target.value); renderModifiedBanner(); renderSeriesTabs(); });
+    };
+    wireText('topName', v => s.topSeed.name = v);
+    wireText('topShort', v => s.topSeed.short = v);
+    wireText('botName', v => s.botSeed.name = v);
+    wireText('botShort', v => s.botSeed.short = v);
+
+    // Mode toggle
+    document.querySelectorAll('.mode-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (s.mode === btn.dataset.mode) return;
+        s.mode = btn.dataset.mode;
+        if (s.mode === 'manual') {
+          for (let g = 1; g <= 7; g++) {
+            const autoSeries = Object.assign({}, s, { mode: 'auto' });
+            s.manual['game' + g] = E.topWinProbForGame(autoSeries, g);
+          }
+        }
+        renderMain();
+        renderModifiedBanner();
+      });
+    });
+
+    // Sliders
+    const topHome = document.getElementById('topHomeWin');
+    if (topHome) topHome.addEventListener('input', e => {
+      s.auto.topHomeWinPct = parseFloat(e.target.value) / 100;
+      document.getElementById('topHomeWinValue').textContent = (s.auto.topHomeWinPct * 100).toFixed(1) + '%';
+      renderModifiedBanner();
+    });
+    const botHome = document.getElementById('botHomeWin');
+    if (botHome) botHome.addEventListener('input', e => {
+      s.auto.botHomeWinPct = parseFloat(e.target.value) / 100;
+      document.getElementById('botHomeWinValue').textContent = (s.auto.botHomeWinPct * 100).toFixed(1) + '%';
+      renderModifiedBanner();
+    });
+
+    // Manual inputs
+    document.querySelectorAll('.manual-input').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const game = parseInt(e.target.dataset.game, 10);
+        const american = e.target.value.trim();
+        const prob = E.americanToProb(american);
+        if (prob !== null) {
+          s.manual['game' + game] = prob;
+          renderMain();
+          renderModifiedBanner();
+        } else {
+          e.target.value = E.probToAmerican(s.manual['game' + game]);
+        }
+      });
+    });
+
+    // State buttons
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) undoBtn.addEventListener('click', () => {
+      if (!s.state.history || s.state.history.length <= 1) return;
+      s.state.history.pop();
+      const last = s.state.history[s.state.history.length - 1];
+      s.state.topWins = last[0];
+      s.state.botWins = last[1];
+      renderAll();
+    });
+    const topWinBtn = document.getElementById('topWinBtn');
+    if (topWinBtn) topWinBtn.addEventListener('click', () => {
+      s.state.topWins++;
+      s.state.history.push([s.state.topWins, s.state.botWins]);
+      renderAll();
+    });
+    const botWinBtn = document.getElementById('botWinBtn');
+    if (botWinBtn) botWinBtn.addEventListener('click', () => {
+      s.state.botWins++;
+      s.state.history.push([s.state.topWins, s.state.botWins]);
+      renderAll();
+    });
+    const resetBtn = document.getElementById('resetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      if (!confirm('Reset this series to 0-0?')) return;
+      s.state.topWins = 0;
+      s.state.botWins = 0;
+      s.state.history = [[0, 0]];
+      renderAll();
+    });
+
+    // Margin overrides
+    document.querySelectorAll('[data-margin]').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const key = e.target.dataset.margin;
+        const v = e.target.value.trim();
+        if (v === '') {
+          delete s.margin[key];
+        } else {
+          const parsed = parseFloat(v);
+          if (!isNaN(parsed)) {
+            s.margin[key] = parsed / 100;
+          } else {
+            e.target.value = '';
+            delete s.margin[key];
+          }
+        }
+        renderModifiedBanner();
+      });
+    });
+  }
+
+  // ===== EXPORT =====
+  function buildExport() {
+    workingData.generatedAt = new Date().toISOString();
+    workingData.generatedBy = 'admin.html';
+    const json = JSON.stringify(workingData, null, 2);
+    return `// =============================================================================
+// playoffs.js — Source of truth for NHL Playoff series data
+// =============================================================================
+// Generated by admin.html on ${new Date().toLocaleString()}.
+// Replace this file in the GitHub repo to update live prices.
+// =============================================================================
+
+const PLAYOFFS_DATA = ${json};
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = PLAYOFFS_DATA;
+}
+`;
+  }
+
+  function showExportModal() {
+    const content = buildExport();
+    document.getElementById('exportContent').value = content;
+    document.getElementById('exportModal').style.display = '';
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', showExportModal);
+  document.getElementById('exportBtn2').addEventListener('click', showExportModal);
+  document.getElementById('closeModalBtn').addEventListener('click', () => {
+    document.getElementById('exportModal').style.display = 'none';
+    document.getElementById('copyConfirm').style.display = 'none';
+  });
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const ta = document.getElementById('exportContent');
+    ta.select();
+    navigator.clipboard.writeText(ta.value).then(() => {
+      const c = document.getElementById('copyConfirm');
+      c.style.display = '';
+      setTimeout(() => { c.style.display = 'none'; }, 2000);
+    });
+  });
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const content = buildExport();
+    const blob = new Blob([content], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'playoffs.js';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('discardBtn').addEventListener('click', () => {
+    if (!confirm('Discard all unsaved changes and reload from playoffs.js?')) return;
+    workingData = JSON.parse(JSON.stringify(ORIGINAL));
+    renderAll();
+  });
+
+  // ===== HELPERS =====
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+  function escapeAttr(str) {
+    return escapeHtml(str);
+  }
+
+  function renderAll() {
+    renderRoundTabs();
+    renderSeriesTabs();
+    renderMain();
+    renderModifiedBanner();
+  }
+})();
+</script>
+
+</body>
+</html>
