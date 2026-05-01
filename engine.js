@@ -6,15 +6,36 @@
   'use strict';
 
   const TOP_HOME_GAMES = new Set([1, 2, 5, 7]);
+  const HOME_ADVANTAGE = 0.04; // ~54% league-average home win rate
 
   // -------- Game schedule helpers --------
   function isTopHome(gameNum) {
     return TOP_HOME_GAMES.has(gameNum);
   }
 
+  // Derived per-game top win probability from MoneyPuck Power Scores.
+  // Reads from global NHL_TEAMS table. Falls back to 0.50 if either team unknown.
+  function derivedTopWinProbForGame(topShort, botShort, topIsHome) {
+    const teams = global.NHL_TEAMS || {};
+    const tp = (teams[topShort] && teams[topShort].power) ? teams[topShort].power.score : 0;
+    const bp = (teams[botShort] && teams[botShort].power) ? teams[botShort].power.score : 0;
+    const dPower = tp - bp;
+    const advantage = topIsHome ? HOME_ADVANTAGE : -HOME_ADVANTAGE;
+    return clamp01(0.50 + advantage + dPower);
+  }
+
   function topWinProbForGame(series, gameNum) {
     if (series.mode === 'manual') {
       return clamp01(series.manual['game' + gameNum]);
+    }
+    if (series.mode === 'derived') {
+      // Need both teams identified to derive
+      const topShort = series.topSeed && series.topSeed.short;
+      const botShort = series.botSeed && series.botSeed.short;
+      if (topShort && botShort) {
+        return derivedTopWinProbForGame(topShort, botShort, isTopHome(gameNum));
+      }
+      // Fallback: if either team is TBD, fall through to auto values
     }
     return isTopHome(gameNum)
       ? clamp01(series.auto.topHomeWinPct)
@@ -402,10 +423,174 @@
     return d.toFixed(2);
   }
 
+  // -------- Outrights computation (full enumeration via Markov + power scores) --------
+  // Walks the bracket recursively, enumerating every possible matchup at every round.
+  // For TBD series, the matchup is determined by upstream winner distributions, weighted
+  // by their probabilities. Series winner probabilities use derived per-game probs (power
+  // scores) when both teams are known. Current series state (topWins/botWins) is honored
+  // when the slotted matchup matches an enumerated pair.
+  function computeOutrights(workingData) {
+    const conn = workingData.bracketConnections;
+    const series = workingData.series;
+    const defaults = workingData.defaults;
+
+    // Compute series win prob for a given (top, bot) matchup using derived per-game
+    // probabilities, starting from initialState (default 0-0). Standard Markov chain.
+    function derivedSeriesWinProb(topShort, botShort, initialState) {
+      const start = initialState || { topWins: 0, botWins: 0 };
+      // If already complete, return deterministic
+      if (start.topWins >= 4) return 1.0;
+      if (start.botWins >= 4) return 0.0;
+      // Run Markov forward from current state
+      let P = {};
+      const startKey = start.topWins + ',' + start.botWins;
+      P[startKey] = 1.0;
+      const startGameTotal = start.topWins + start.botWins;
+      for (let g = startGameTotal; g < 7; g++) {
+        const gameNum = g + 1;
+        const pTopGame = derivedTopWinProbForGame(topShort, botShort, isTopHome(gameNum));
+        const pBotGame = 1 - pTopGame;
+        const newP = {};
+        for (const key of Object.keys(P)) {
+          const [iStr, jStr] = key.split(',');
+          const i = +iStr, j = +jStr;
+          if (i >= 4 || j >= 4) {
+            // Terminal state, carry forward
+            newP[key] = (newP[key] || 0) + P[key];
+            continue;
+          }
+          const kT = (i + 1) + ',' + j;
+          const kB = i + ',' + (j + 1);
+          newP[kT] = (newP[kT] || 0) + P[key] * pTopGame;
+          newP[kB] = (newP[kB] || 0) + P[key] * pBotGame;
+        }
+        P = newP;
+      }
+      // P(top wins series) = sum over all "4,j" terminal states
+      let pTopSeries = 0;
+      for (let j = 0; j <= 3; j++) pTopSeries += P['4,' + j] || 0;
+      return pTopSeries;
+    }
+
+    // Memoized: returns distribution {teamShort: probability} of who wins this series.
+    // Recursively computes upstream entry distributions when slots are TBD.
+    const winnerDistCache = {};
+    function computeWinnerDist(seriesId) {
+      if (winnerDistCache[seriesId]) return winnerDistCache[seriesId];
+      const s = series[seriesId];
+      let result;
+
+      // If complete, winner is known
+      if (s.state.topWins >= 4 && s.topSeed.short) {
+        result = { [s.topSeed.short]: 1.0 };
+      } else if (s.state.botWins >= 4 && s.botSeed.short) {
+        result = { [s.botSeed.short]: 1.0 };
+      } else {
+        // Get entry distributions
+        const c = conn[seriesId];
+        const topDist = s.topSeed.short
+          ? { [s.topSeed.short]: 1.0 }
+          : (c ? computeWinnerDist(c.topFrom) : {});
+        const botDist = s.botSeed.short
+          ? { [s.botSeed.short]: 1.0 }
+          : (c ? computeWinnerDist(c.botFrom) : {});
+
+        result = {};
+        for (const [tShort, pT] of Object.entries(topDist)) {
+          for (const [bShort, pB] of Object.entries(botDist)) {
+            if (tShort === bShort) continue; // same team can't face itself
+            const pairProb = pT * pB;
+            if (pairProb === 0) continue;
+            // Use current state ONLY if this matchup matches the actual slotted teams
+            const slottedMatch = s.topSeed.short === tShort && s.botSeed.short === bShort;
+            const useState = slottedMatch ? s.state : { topWins: 0, botWins: 0 };
+            const pTopWins = derivedSeriesWinProb(tShort, bShort, useState);
+            result[tShort] = (result[tShort] || 0) + pairProb * pTopWins;
+            result[bShort] = (result[bShort] || 0) + pairProb * (1 - pTopWins);
+          }
+        }
+        // Normalize against any same-team-pairing exclusions
+        const total = Object.values(result).reduce((a, b) => a + b, 0);
+        if (total > 0 && Math.abs(total - 1) > 1e-9) {
+          for (const k of Object.keys(result)) result[k] /= total;
+        }
+      }
+
+      winnerDistCache[seriesId] = result;
+      return result;
+    }
+
+    // Get conference final + SCF winner distributions
+    const eastConfId = workingData.bracket.east.r3;
+    const westConfId = workingData.bracket.west.r3;
+    const scfId = workingData.bracket.final;
+    const eastConfWinners = computeWinnerDist(eastConfId);
+    const westConfWinners = computeWinnerDist(westConfId);
+    const cupWinners = computeWinnerDist(scfId);
+
+    // Build teams array — one row per R1 team
+    const teams = [];
+    const r1Ids = [...workingData.bracket.east.r1, ...workingData.bracket.west.r1];
+    r1Ids.forEach(r1Id => {
+      const r1 = series[r1Id];
+      [r1.topSeed, r1.botSeed].forEach(seed => {
+        if (!seed.short) return;
+        const confDist = r1.conference === 'East' ? eastConfWinners : westConfWinners;
+        teams.push({
+          short: seed.short,
+          name: seed.name,
+          conference: r1.conference,
+          r1SeriesId: r1Id,
+          fairWinConference: confDist[seed.short] || 0,
+          fairWinStanleyCup: cupWinners[seed.short] || 0
+        });
+      });
+    });
+
+    // Apply margins
+    const marginEastConf = (defaults.margin && defaults.margin.conferenceWinner) || 0.10;
+    const marginWestConf = (defaults.margin && defaults.margin.conferenceWinner) || 0.10;
+    const marginSCF      = (defaults.margin && defaults.margin.stanleyCupWinner) || 0.15;
+
+    const eastTeams = teams.filter(t => t.conference === 'East');
+    const westTeams = teams.filter(t => t.conference === 'West');
+
+    const scaleConf = (subset, marginPct) => {
+      const sum = subset.reduce((a, t) => a + t.fairWinConference, 0);
+      if (sum === 0) { subset.forEach(t => { t.offeredWinConference = 0; }); return 0; }
+      const factor = (1 + marginPct) / sum;
+      subset.forEach(t => { t.offeredWinConference = Math.min(t.fairWinConference * factor, 0.999); });
+      return subset.reduce((a, t) => a + t.offeredWinConference, 0) - 1;
+    };
+    const eastConfMargin = scaleConf(eastTeams, marginEastConf);
+    const westConfMargin = scaleConf(westTeams, marginWestConf);
+
+    const scfSum = teams.reduce((a, t) => a + t.fairWinStanleyCup, 0);
+    if (scfSum > 0) {
+      const factor = (1 + marginSCF) / scfSum;
+      teams.forEach(t => { t.offeredWinStanleyCup = Math.min(t.fairWinStanleyCup * factor, 0.999); });
+    } else {
+      teams.forEach(t => { t.offeredWinStanleyCup = 0; });
+    }
+    const scfMargin = teams.reduce((a, t) => a + t.offeredWinStanleyCup, 0) - 1;
+
+    return {
+      teams,
+      eastTeams: eastTeams.slice().sort((a, b) => b.fairWinConference - a.fairWinConference),
+      westTeams: westTeams.slice().sort((a, b) => b.fairWinConference - a.fairWinConference),
+      allTeamsByCup: teams.slice().sort((a, b) => b.fairWinStanleyCup - a.fairWinStanleyCup),
+      eastConfMargin,
+      westConfMargin,
+      scfMargin
+    };
+  }
+
   // -------- Public API --------
   global.PlayoffsEngine = {
     isTopHome,
     topWinProbForGame,
+    derivedTopWinProbForGame,
+    HOME_ADVANTAGE,
     clamp01,
     probToDecimal,
     decimalToAmerican,
@@ -417,6 +602,7 @@
     applyMargin,
     resolveMargin,
     computeMarkets,
+    computeOutrights,
     marginBadgeColor,
     fmtMargin,
     fmtPct,

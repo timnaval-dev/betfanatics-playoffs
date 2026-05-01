@@ -361,6 +361,111 @@
     color: var(--text-secondary); margin-bottom: 8px;
   }
 
+  /* OUTRIGHTS */
+  .outrights-banner {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.10), rgba(139, 92, 246, 0.02));
+    border: 1px solid var(--accent); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 20px;
+  }
+  .outrights-banner-title {
+    font-family: var(--display); font-weight: 600; font-size: 16px;
+    color: var(--accent-bright); letter-spacing: -0.01em; margin-bottom: 4px;
+  }
+  .outrights-banner-desc {
+    font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+  }
+  .outright-team {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+  }
+  .outright-team-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .outright-team-short {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--text-primary); min-width: 38px;
+  }
+  .outright-team-name {
+    font-size: 12px; color: var(--text-tertiary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* DERIVED MODE PANEL */
+  .derived-panel { display: flex; flex-direction: column; gap: 14px; }
+  .derived-fallback {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .derived-fallback-title { color: rgb(245, 158, 11); font-weight: 600; font-size: 13px; }
+  .derived-fallback-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+  .derived-formula-card {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .derived-formula-title {
+    font-family: var(--display); font-weight: 600; font-size: 13px;
+    color: var(--text-secondary); margin-bottom: 10px; letter-spacing: -0.01em;
+  }
+  .derived-formula-row {
+    display: flex; align-items: center; gap: 10px; padding: 5px 0;
+    flex-wrap: wrap; font-size: 12px;
+  }
+  .derived-team-tag {
+    font-family: var(--mono); font-weight: 700; font-size: 11px;
+    padding: 3px 8px; border-radius: 4px; min-width: 38px; text-align: center;
+  }
+  .derived-team-tag.top { background: var(--top-color, var(--accent)); color: white; }
+  .derived-team-tag.bot { background: var(--bot-color, var(--accent-bright)); color: white; }
+  .derived-formula-equals {
+    font-family: var(--mono); color: var(--text-primary); font-weight: 600; font-size: 12px;
+  }
+  .derived-component {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+    padding: 2px 6px; background: var(--bg-secondary); border-radius: 3px;
+  }
+  .derived-formula-divider {
+    height: 1px; background: var(--border); margin: 8px 0;
+  }
+  .derived-formula-label {
+    font-size: 12px; color: var(--text-secondary); min-width: 130px;
+  }
+  .derived-formula-value {
+    font-family: var(--mono); font-weight: 600; color: var(--text-primary); font-size: 12px;
+  }
+  .derived-formula-note {
+    font-size: 11px; color: var(--text-tertiary); font-style: italic;
+  }
+  .derived-output-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  }
+  @media (max-width: 720px) {
+    .derived-output-grid { grid-template-columns: 1fr; }
+  }
+  .derived-output-card {
+    background: var(--bg-tertiary); border-radius: 10px; padding: 14px;
+    border-left: 3px solid var(--accent);
+  }
+  .derived-output-card.top { border-left-color: var(--top-color, var(--accent)); }
+  .derived-output-card.bot { border-left-color: var(--bot-color, var(--accent-bright)); }
+  .derived-output-label {
+    font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .derived-output-value {
+    font-family: var(--display); font-weight: 700; font-size: 26px;
+    color: var(--text-primary); margin-bottom: 4px;
+  }
+  .derived-output-formula {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+  }
+  .derived-source-note {
+    font-size: 11px; color: var(--text-tertiary); text-align: center; padding: 4px;
+  }
+  .derived-source-note code {
+    font-family: var(--mono); background: var(--bg-tertiary);
+    padding: 1px 5px; border-radius: 3px; color: var(--text-secondary);
+  }
+
   /* MARKETS GRID */
   .markets-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
@@ -581,7 +686,8 @@
     { id: 'round1', label: 'Round 1', getSeriesIds: () => [...workingData.bracket.east.r1, ...workingData.bracket.west.r1] },
     { id: 'round2', label: 'Round 2', getSeriesIds: () => [...workingData.bracket.east.r2, ...workingData.bracket.west.r2] },
     { id: 'round3', label: 'Conference Finals', getSeriesIds: () => [workingData.bracket.east.r3, workingData.bracket.west.r3] },
-    { id: 'round4', label: 'Stanley Cup Final', getSeriesIds: () => [workingData.bracket.final] }
+    { id: 'round4', label: 'Stanley Cup Final', getSeriesIds: () => [workingData.bracket.final] },
+    { id: 'outrights', label: 'Outrights', getSeriesIds: () => [], isOutrights: true }
   ];
 
   function getActiveSeries() {
@@ -601,18 +707,24 @@
     const el = document.getElementById('roundTabs');
     el.innerHTML = '';
     ROUND_DEFS.forEach(rd => {
-      const ids = rd.getSeriesIds();
-      const allTBD = ids.every(id => isSeriesTBD(workingData.series[id]));
       const btn = document.createElement('button');
       btn.className = 'round-tab' + (rd.id === activeRound ? ' active' : '');
       btn.textContent = rd.label;
-      btn.disabled = allTBD;
+      if (rd.isOutrights) {
+        // Outrights tab is always enabled
+        btn.disabled = false;
+      } else {
+        const ids = rd.getSeriesIds();
+        const allTBD = ids.every(id => isSeriesTBD(workingData.series[id]));
+        btn.disabled = allTBD;
+      }
       btn.addEventListener('click', () => {
         activeRound = rd.id;
-        const ids2 = rd.getSeriesIds();
-        // Pick first non-TBD series, or first if all TBD
-        const first = ids2.find(id => !isSeriesTBD(workingData.series[id])) || ids2[0];
-        activeSeriesId = first;
+        if (!rd.isOutrights) {
+          const ids2 = rd.getSeriesIds();
+          const first = ids2.find(id => !isSeriesTBD(workingData.series[id])) || ids2[0];
+          activeSeriesId = first;
+        }
         renderAll();
       });
       el.appendChild(btn);
@@ -625,6 +737,11 @@
     el.dataset.round = activeRound;
     el.innerHTML = '';
     const rd = ROUND_DEFS.find(r => r.id === activeRound);
+    if (rd.isOutrights) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
     const ids = rd.getSeriesIds();
     ids.forEach(id => {
       const s = workingData.series[id];
@@ -721,6 +838,14 @@
   // ===== RENDER: main content =====
   function renderMain() {
     const el = document.getElementById('mainContent');
+    const rd = ROUND_DEFS.find(r => r.id === activeRound);
+
+    // Outrights view (futures markets)
+    if (rd && rd.isOutrights) {
+      el.innerHTML = renderOutrightsView();
+      return;
+    }
+
     const s = getActiveSeries();
     if (isSeriesTBD(s)) {
       el.innerHTML = `
@@ -757,17 +882,94 @@
 
   // ===== RENDER: controls =====
   function renderControls(s) {
-    const isManual = s.mode === 'manual';
+    const mode = s.mode || 'auto';
     return `
       <div class="controls">
         <div class="controls-header">
           <div class="controls-title">${s.label} — Pricing Inputs</div>
           <div class="mode-toggle">
-            <button class="toggle ${!isManual ? 'active' : ''}" data-mode="auto">Auto (Sliders)</button>
-            <button class="toggle ${isManual ? 'active' : ''}" data-mode="manual">Manual (Per Game)</button>
+            <button class="toggle ${mode === 'derived' ? 'active' : ''}" data-mode="derived">Derived (MoneyPuck)</button>
+            <button class="toggle ${mode === 'auto' ? 'active' : ''}" data-mode="auto">Auto (Sliders)</button>
+            <button class="toggle ${mode === 'manual' ? 'active' : ''}" data-mode="manual">Manual (Per Game)</button>
           </div>
         </div>
-        ${isManual ? renderManualInputs(s) : renderAutoInputs(s)}
+        ${mode === 'manual' ? renderManualInputs(s) : (mode === 'derived' ? renderDerivedInputs(s) : renderAutoInputs(s))}
+      </div>
+    `;
+  }
+
+  function renderDerivedInputs(s) {
+    const teams = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : {};
+    const topShort = s.topSeed && s.topSeed.short;
+    const botShort = s.botSeed && s.botSeed.short;
+    const tp = (topShort && teams[topShort] && teams[topShort].power) ? teams[topShort].power : null;
+    const bp = (botShort && teams[botShort] && teams[botShort].power) ? teams[botShort].power : null;
+
+    if (!tp || !bp) {
+      return `
+        <div class="derived-fallback">
+          <div class="derived-fallback-title">⚠️ Falling back to Auto sliders</div>
+          <div class="derived-fallback-desc">
+            One or both teams are TBD, so derived mode can't compute per-game probabilities yet.
+            The series will still price using the Auto sliders below until both teams are slotted.
+          </div>
+          ${renderAutoInputs(s)}
+        </div>
+      `;
+    }
+
+    const dPower = tp.score - bp.score;
+    const topHome = E.derivedTopWinProbForGame(topShort, botShort, true);
+    const botHome = 1 - E.derivedTopWinProbForGame(topShort, botShort, false);
+    const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+
+    return `
+      <div class="derived-panel">
+        <div class="derived-formula-card">
+          <div class="derived-formula-title">Per-Game Win Probability</div>
+          <div class="derived-formula-row">
+            <span class="derived-team-tag top">${escapeHtml(topShort)}</span>
+            <span class="derived-formula-equals">Power: ${fmt(tp.score)}</span>
+            <span class="derived-component">ATW ${fmt(tp.abilityToWin)}</span>
+            <span class="derived-component">SC ${fmt(tp.scoringChances)}</span>
+            <span class="derived-component">G ${fmt(tp.goaltending)}</span>
+          </div>
+          <div class="derived-formula-row">
+            <span class="derived-team-tag bot">${escapeHtml(botShort)}</span>
+            <span class="derived-formula-equals">Power: ${fmt(bp.score)}</span>
+            <span class="derived-component">ATW ${fmt(bp.abilityToWin)}</span>
+            <span class="derived-component">SC ${fmt(bp.scoringChances)}</span>
+            <span class="derived-component">G ${fmt(bp.goaltending)}</span>
+          </div>
+          <div class="derived-formula-divider"></div>
+          <div class="derived-formula-row">
+            <span class="derived-formula-label">Power Difference</span>
+            <span class="derived-formula-value">${fmt(dPower)}</span>
+            <span class="derived-formula-note">favors ${dPower >= 0 ? topShort : botShort}</span>
+          </div>
+          <div class="derived-formula-row">
+            <span class="derived-formula-label">Home Advantage</span>
+            <span class="derived-formula-value">+4.00%</span>
+            <span class="derived-formula-note">league average</span>
+          </div>
+        </div>
+
+        <div class="derived-output-grid">
+          <div class="derived-output-card top">
+            <div class="derived-output-label">${escapeHtml(topShort)} home win % (G1, G2, G5, G7)</div>
+            <div class="derived-output-value">${(topHome * 100).toFixed(2)}%</div>
+            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(dPower)} = ${(topHome * 100).toFixed(2)}%</div>
+          </div>
+          <div class="derived-output-card bot">
+            <div class="derived-output-label">${escapeHtml(botShort)} home win % (G3, G4, G6)</div>
+            <div class="derived-output-value">${(botHome * 100).toFixed(2)}%</div>
+            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(-dPower)} = ${(botHome * 100).toFixed(2)}%</div>
+          </div>
+        </div>
+
+        <div class="derived-source-note">
+          Source: MoneyPuck Power Rankings. Update <code>teams.js</code> to refresh.
+        </div>
       </div>
     `;
   }
@@ -942,6 +1144,67 @@
     `;
   }
 
+  // ===== RENDER: outrights / futures view =====
+  function renderOutrightsView() {
+    const o = E.computeOutrights(workingData);
+
+    const renderTeamRow = (team, probField, offeredField) => {
+      const fair = team[probField];
+      const offered = team[offeredField];
+      const dec = E.probToDecimal(offered);
+      const american = E.decimalToAmerican(dec);
+      const isFav = dec > 0 && dec < 2;
+      const muted = fair < 0.001 ? 'muted' : '';
+      const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[team.short] : null;
+      const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
+      return `
+        <div class="row ${muted}" style="--row-team-color:${accent};">
+          <div class="row-label outright-team">
+            <span class="outright-team-dot" style="background:${accent};"></span>
+            <span class="outright-team-short">${escapeHtml(team.short)}</span>
+            <span class="outright-team-name">${escapeHtml(team.name)}</span>
+          </div>
+          <div class="row-prob">${E.fmtPct(fair)}</div>
+          <div class="row-decimal">${E.fmtDecimal(dec)}</div>
+          <div class="row-american ${isFav ? 'fav' : 'dog'}">${american}</div>
+        </div>
+      `;
+    };
+
+    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, totalMargin, wide) => {
+      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField)).join('');
+      return `
+        <div class="market ${wide ? 'wide' : ''}">
+          <div class="market-header">
+            <div class="market-title">${title}</div>
+            <div class="market-tag">${subtitle}</div>
+          </div>
+          <div class="col-headers"><span>Team</span><span>Prob</span><span>Dec</span><span>US</span></div>
+          <div class="market-body">${rowsHtml}</div>
+          <div class="market-footer">
+            <span class="market-footer-label">Overall Margin</span>
+            ${renderMarginBadge(totalMargin)}
+          </div>
+        </div>
+      `;
+    };
+
+    return `
+      <div class="outrights-banner">
+        <div class="outrights-banner-title">Outright / Futures Markets</div>
+        <div class="outrights-banner-desc">
+          Conference and Stanley Cup winner odds, computed from each team's bracket path.
+          Updates dynamically as you adjust series settings.
+        </div>
+      </div>
+      <div class="markets-grid">
+        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', o.eastConfMargin)}
+        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', o.westConfMargin)}
+        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', o.scfMargin, true)}
+      </div>
+    `;
+  }
+
   function renderRow(leg) {
     const dec = E.probToDecimal(leg.offered);
     const american = E.decimalToAmerican(dec);
@@ -1006,13 +1269,15 @@
     // Mode toggle
     document.querySelectorAll('.mode-toggle button').forEach(btn => {
       btn.addEventListener('click', () => {
-        s.mode = btn.dataset.mode;
-        // When switching to manual, populate from auto sliders if not already set
-        if (s.mode === 'manual') {
+        const prevMode = s.mode || 'auto';
+        const newMode = btn.dataset.mode;
+        if (prevMode === newMode) return;
+        s.mode = newMode;
+        // When switching TO manual, seed per-game probs from previous mode
+        if (newMode === 'manual') {
+          const seriesInPrevMode = Object.assign({}, s, { mode: prevMode });
           for (let g = 1; g <= 7; g++) {
-            // Recompute from auto so manual reflects current sliders
-            const autoSeries = Object.assign({}, s, { mode: 'auto' });
-            s.manual['game' + g] = E.topWinProbForGame(autoSeries, g);
+            s.manual['game' + g] = E.topWinProbForGame(seriesInPrevMode, g);
           }
         }
         renderMain();

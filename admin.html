@@ -230,6 +230,83 @@
   .mode-toggle { display: flex; gap: 6px; }
   .mode-toggle button { padding: 6px 12px; font-size: 12px; }
 
+  /* DERIVED MODE PANEL */
+  .derived-panel { display: flex; flex-direction: column; gap: 14px; }
+  .derived-fallback {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .derived-fallback-title { color: rgb(245, 158, 11); font-weight: 600; font-size: 13px; }
+  .derived-fallback-desc { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+  .derived-formula-card {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .derived-formula-title {
+    font-family: var(--display); font-weight: 600; font-size: 13px;
+    color: var(--text-secondary); margin-bottom: 10px; letter-spacing: -0.01em;
+  }
+  .derived-formula-row {
+    display: flex; align-items: center; gap: 10px; padding: 5px 0;
+    flex-wrap: wrap; font-size: 12px;
+  }
+  .derived-team-tag {
+    font-family: var(--mono); font-weight: 700; font-size: 11px;
+    padding: 3px 8px; border-radius: 4px; min-width: 38px; text-align: center;
+  }
+  .derived-team-tag.top { background: var(--top-color, var(--accent)); color: white; }
+  .derived-team-tag.bot { background: var(--bot-color, var(--accent-bright)); color: white; }
+  .derived-formula-equals {
+    font-family: var(--mono); color: var(--text-primary); font-weight: 600; font-size: 12px;
+  }
+  .derived-component {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+    padding: 2px 6px; background: var(--bg-secondary); border-radius: 3px;
+  }
+  .derived-formula-divider {
+    height: 1px; background: var(--border); margin: 8px 0;
+  }
+  .derived-formula-label {
+    font-size: 12px; color: var(--text-secondary); min-width: 130px;
+  }
+  .derived-formula-value {
+    font-family: var(--mono); font-weight: 600; color: var(--text-primary); font-size: 12px;
+  }
+  .derived-formula-note {
+    font-size: 11px; color: var(--text-tertiary); font-style: italic;
+  }
+  .derived-output-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  }
+  @media (max-width: 720px) {
+    .derived-output-grid { grid-template-columns: 1fr; }
+  }
+  .derived-output-card {
+    background: var(--bg-tertiary); border-radius: 10px; padding: 14px;
+    border-left: 3px solid var(--accent);
+  }
+  .derived-output-card.top { border-left-color: var(--top-color, var(--accent)); }
+  .derived-output-card.bot { border-left-color: var(--bot-color, var(--accent-bright)); }
+  .derived-output-label {
+    font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .derived-output-value {
+    font-family: var(--display); font-weight: 700; font-size: 26px;
+    color: var(--text-primary); margin-bottom: 4px;
+  }
+  .derived-output-formula {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+  }
+  .derived-source-note {
+    font-size: 11px; color: var(--text-tertiary); text-align: center; padding: 4px;
+  }
+  .derived-source-note code {
+    font-family: var(--mono); background: var(--bg-tertiary);
+    padding: 1px 5px; border-radius: 3px; color: var(--text-secondary);
+  }
+
   .grid {
     display: grid; grid-template-columns: repeat(2, 1fr);
     gap: 18px;
@@ -725,17 +802,95 @@
   }
 
   function renderInputsPanel(s) {
-    const isManual = s.mode === 'manual';
+    const mode = s.mode || 'auto';
     return `
       <div class="panel">
         <div class="panel-header">
           <div class="panel-title">Pricing Inputs</div>
           <div class="mode-toggle">
-            <button class="toggle ${!isManual ? 'active' : ''}" data-mode="auto">Auto Sliders</button>
-            <button class="toggle ${isManual ? 'active' : ''}" data-mode="manual">Manual Per-Game</button>
+            <button class="toggle ${mode === 'derived' ? 'active' : ''}" data-mode="derived">Derived (MoneyPuck)</button>
+            <button class="toggle ${mode === 'auto' ? 'active' : ''}" data-mode="auto">Auto Sliders</button>
+            <button class="toggle ${mode === 'manual' ? 'active' : ''}" data-mode="manual">Manual Per-Game</button>
           </div>
         </div>
-        ${isManual ? renderManualInputs(s) : renderAutoInputs(s)}
+        ${mode === 'manual' ? renderManualInputs(s) : (mode === 'derived' ? renderDerivedInputs(s) : renderAutoInputs(s))}
+      </div>
+    `;
+  }
+
+  function renderDerivedInputs(s) {
+    const teams = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : {};
+    const topShort = s.topSeed && s.topSeed.short;
+    const botShort = s.botSeed && s.botSeed.short;
+    const tp = (topShort && teams[topShort] && teams[topShort].power) ? teams[topShort].power : null;
+    const bp = (botShort && teams[botShort] && teams[botShort].power) ? teams[botShort].power : null;
+
+    if (!tp || !bp) {
+      return `
+        <div class="derived-fallback">
+          <div class="derived-fallback-title">⚠️ Falling back to Auto Sliders</div>
+          <div class="derived-fallback-desc">
+            One or both teams are TBD, so derived mode cannot compute per-game probabilities.
+            The series will price using the Auto sliders below until both teams are slotted.
+            Outright markets will still use full-derived enumeration.
+          </div>
+          ${renderAutoInputs(s)}
+        </div>
+      `;
+    }
+
+    const dPower = tp.score - bp.score;
+    const topHome = E.derivedTopWinProbForGame(topShort, botShort, true);
+    const botHome = 1 - E.derivedTopWinProbForGame(topShort, botShort, false);
+    const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+
+    return `
+      <div class="derived-panel">
+        <div class="derived-formula-card">
+          <div class="derived-formula-title">Per-Game Win Probability</div>
+          <div class="derived-formula-row">
+            <span class="derived-team-tag top">${escapeHtml(topShort)}</span>
+            <span class="derived-formula-equals">Power: ${fmt(tp.score)}</span>
+            <span class="derived-component">ATW ${fmt(tp.abilityToWin)}</span>
+            <span class="derived-component">SC ${fmt(tp.scoringChances)}</span>
+            <span class="derived-component">G ${fmt(tp.goaltending)}</span>
+          </div>
+          <div class="derived-formula-row">
+            <span class="derived-team-tag bot">${escapeHtml(botShort)}</span>
+            <span class="derived-formula-equals">Power: ${fmt(bp.score)}</span>
+            <span class="derived-component">ATW ${fmt(bp.abilityToWin)}</span>
+            <span class="derived-component">SC ${fmt(bp.scoringChances)}</span>
+            <span class="derived-component">G ${fmt(bp.goaltending)}</span>
+          </div>
+          <div class="derived-formula-divider"></div>
+          <div class="derived-formula-row">
+            <span class="derived-formula-label">Power Difference</span>
+            <span class="derived-formula-value">${fmt(dPower)}</span>
+            <span class="derived-formula-note">favors ${dPower >= 0 ? topShort : botShort}</span>
+          </div>
+          <div class="derived-formula-row">
+            <span class="derived-formula-label">Home Advantage</span>
+            <span class="derived-formula-value">+4.00%</span>
+            <span class="derived-formula-note">league average</span>
+          </div>
+        </div>
+
+        <div class="derived-output-grid">
+          <div class="derived-output-card top">
+            <div class="derived-output-label">${escapeHtml(topShort)} home win % (G1, G2, G5, G7)</div>
+            <div class="derived-output-value">${(topHome * 100).toFixed(2)}%</div>
+            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(dPower)} = ${(topHome * 100).toFixed(2)}%</div>
+          </div>
+          <div class="derived-output-card bot">
+            <div class="derived-output-label">${escapeHtml(botShort)} home win % (G3, G4, G6)</div>
+            <div class="derived-output-value">${(botHome * 100).toFixed(2)}%</div>
+            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(-dPower)} = ${(botHome * 100).toFixed(2)}%</div>
+          </div>
+        </div>
+
+        <div class="derived-source-note">
+          Source: MoneyPuck Power Rankings. Update <code>teams.js</code> in the repo to refresh.
+        </div>
       </div>
     `;
   }
@@ -919,12 +1074,14 @@
     // Mode toggle
     document.querySelectorAll('.mode-toggle button').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (s.mode === btn.dataset.mode) return;
-        s.mode = btn.dataset.mode;
-        if (s.mode === 'manual') {
+        const prevMode = s.mode || 'auto';
+        const newMode = btn.dataset.mode;
+        if (prevMode === newMode) return;
+        s.mode = newMode;
+        if (newMode === 'manual') {
+          const seriesInPrevMode = Object.assign({}, s, { mode: prevMode });
           for (let g = 1; g <= 7; g++) {
-            const autoSeries = Object.assign({}, s, { mode: 'auto' });
-            s.manual['game' + g] = E.topWinProbForGame(autoSeries, g);
+            s.manual['game' + g] = E.topWinProbForGame(seriesInPrevMode, g);
           }
         }
         renderMain();
