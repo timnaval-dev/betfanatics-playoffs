@@ -253,15 +253,25 @@
   }
   .team-dot.top { background: var(--top-color); }
   .team-dot.bot { background: var(--bot-color); }
-  input[type="text"], input[type="number"] {
+  input[type="text"], input[type="number"], select {
     background: var(--bg-tertiary); border: 1px solid var(--border);
     color: var(--text-primary); padding: 9px 12px; border-radius: 7px;
     font-family: var(--body); font-size: 14px; font-weight: 500; width: 100%;
     transition: all 0.15s;
   }
-  input[type="text"]:focus, input[type="number"]:focus {
+  input[type="text"]:focus, input[type="number"]:focus, select:focus {
     outline: none; border-color: var(--accent); background: var(--bg-elevated);
   }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a0a0a8' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  select option { background: var(--bg-tertiary); color: var(--text-primary); }
   .slider-row { display: flex; align-items: center; gap: 12px; }
   .slider-value {
     font-family: var(--mono); font-size: 14px; font-weight: 600;
@@ -677,31 +687,37 @@
   }
 
   function renderIdentityPanel(s) {
+    const teams = (typeof teamsSortedByName === 'function') ? teamsSortedByName() : [];
+    const buildOptions = (currentShort) => {
+      let html = `<option value="">— Empty / TBD —</option>`;
+      teams.forEach(({ short, name }) => {
+        const sel = short === currentShort ? ' selected' : '';
+        html += `<option value="${short}"${sel}>${escapeHtml(name)}</option>`;
+      });
+      // If current short isn't in the team list, add it as a "Custom" option so we don't lose it
+      if (currentShort && !teams.find(t => t.short === currentShort)) {
+        html += `<option value="${escapeAttr(currentShort)}" selected>Custom: ${escapeHtml(s.topSeed.name || currentShort)}</option>`;
+      }
+      return html;
+    };
+
     return `
       <div class="panel">
         <div class="panel-header"><div class="panel-title">Series Identity</div></div>
-        <div class="identity-grid">
+        <div class="identity-grid" style="grid-template-columns: 1fr 1fr;">
           <div class="control-group">
-            <label>Top Seed Name</label>
+            <label>Top Seed</label>
             <div class="team-input">
               <span class="team-dot top"></span>
-              <input type="text" id="topName" value="${escapeAttr(s.topSeed.name)}">
+              <select id="topTeamSelect">${buildOptions(s.topSeed.short)}</select>
             </div>
           </div>
           <div class="control-group">
-            <label>Top Seed Short Code</label>
-            <input type="text" id="topShort" value="${escapeAttr(s.topSeed.short)}" placeholder="3-letter abbr.">
-          </div>
-          <div class="control-group">
-            <label>Bottom Seed Name</label>
+            <label>Bottom Seed</label>
             <div class="team-input">
               <span class="team-dot bot"></span>
-              <input type="text" id="botName" value="${escapeAttr(s.botSeed.name)}">
+              <select id="botTeamSelect">${buildOptions(s.botSeed.short)}</select>
             </div>
-          </div>
-          <div class="control-group">
-            <label>Bottom Seed Short Code</label>
-            <input type="text" id="botShort" value="${escapeAttr(s.botSeed.short)}" placeholder="3-letter abbr.">
           </div>
         </div>
       </div>
@@ -883,15 +899,22 @@
       });
     });
 
-    // Identity
-    const wireText = (id, fn) => {
+    // Identity dropdowns — selecting a team auto-fills both name and short
+    const wireTeamSelect = (id, seedKey) => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', e => { fn(e.target.value); renderModifiedBanner(); renderSeriesTabs(); });
+      if (!el) return;
+      el.addEventListener('change', e => {
+        const short = e.target.value;
+        if (short && typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[short]) {
+          s[seedKey] = { name: NHL_TEAMS[short].name, short: short };
+        } else {
+          s[seedKey] = { name: '', short: '' };
+        }
+        renderAll();
+      });
     };
-    wireText('topName', v => s.topSeed.name = v);
-    wireText('topShort', v => s.topSeed.short = v);
-    wireText('botName', v => s.botSeed.name = v);
-    wireText('botShort', v => s.botSeed.short = v);
+    wireTeamSelect('topTeamSelect', 'topSeed');
+    wireTeamSelect('botTeamSelect', 'botSeed');
 
     // Mode toggle
     document.querySelectorAll('.mode-toggle button').forEach(btn => {
