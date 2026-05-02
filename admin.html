@@ -920,6 +920,88 @@
     .state-wins { font-size: 44px; }
     .manual-grid { grid-template-columns: repeat(4, 1fr); }
   }
+
+  /* Live markets panel (admin only) — collapsible cards that match pricing.html style */
+  .live-markets-panel {
+    margin-top: 18px;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+  }
+  .live-markets-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .live-markets-header h3 {
+    font-family: var(--display); font-size: 14px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: -0.01em; margin: 0;
+  }
+  .live-markets-hint {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .live-markets-actions {
+    display: flex; gap: 8px;
+  }
+  .live-markets-actions button {
+    background: transparent; border: 1px solid var(--border); color: var(--text-tertiary);
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 5px 10px; border-radius: 5px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .live-markets-actions button:hover { color: var(--text-primary); border-color: var(--accent); }
+
+  /* Collapsible market wrapper */
+  .market.collapsible { padding: 0; }
+  .market.collapsible .market-header {
+    padding: 14px 18px 12px; margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+    transition: background 0.1s;
+  }
+  .market.collapsible .market-header:hover { background: rgba(255,255,255,0.02); }
+  .market.collapsible.collapsed .market-header { border-bottom: none; }
+  .market.collapsible .market-title-wrap {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .market-toggle-caret {
+    display: inline-block; width: 10px; height: 10px;
+    color: var(--text-tertiary); font-size: 10px;
+    transition: transform 0.15s;
+  }
+  .market.collapsible.collapsed .market-toggle-caret { transform: rotate(-90deg); }
+  .market.collapsible .market-content {
+    overflow: hidden;
+    transition: max-height 0.2s ease, opacity 0.15s ease;
+  }
+  .market.collapsible.collapsed .market-content {
+    max-height: 0; opacity: 0;
+  }
+  .market.collapsible:not(.collapsed) .market-content {
+    max-height: 9999px; opacity: 1;
+    padding-top: 6px; padding-bottom: 6px;
+  }
+
+  /* Pair dividers + per-pair margin badges (paired markets like spreads, totals O/U) */
+  .pair-margin {
+    padding: 4px 18px 8px;
+    display: flex; justify-content: flex-end;
+  }
+  .pair-divider {
+    height: 1px; background: var(--border); margin: 4px 18px;
+  }
+
+  /* Highlight current state row (e.g. in After Game N markets) */
+  .row.current {
+    background: rgba(139, 92, 246, 0.08);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .row.current .row-label { color: var(--accent-bright); font-weight: 500; }
+
+  /* Settled state for After Game N markets */
+  .market-tag.settled {
+    color: var(--accent-bright); background: rgba(139, 92, 246, 0.12);
+    padding: 3px 8px; border-radius: 4px; border: 1px solid var(--accent-dim);
+  }
 </style>
 </head>
 <body>
@@ -1120,10 +1202,13 @@
     html += renderStatePanel(s);
     // Margin overrides
     html += renderMarginPanel(s);
+    // Live derived markets — read-only, updates with every input change
+    html += renderLiveMarketsPanel(s);
 
     el.innerHTML = html;
     applyTeamColors(s);
     wireMain(s);
+    wireLiveMarkets();
   }
 
   // ===== BRACKET BUILDER (used by outrights view) =====
@@ -1740,6 +1825,150 @@
       </div>
     `;
   }
+
+  // ===== LIVE MARKETS PANEL =====
+  // Tracks which market cards are collapsed. Set survives renderAll() since it's
+  // module-scoped. Default state: only 'seriesWinner' is expanded; everything else
+  // starts collapsed so the panel is compact on first render.
+  // Caret state flips automatically because the CSS targets .market.collapsed.
+  const COLLAPSED_MARKETS = new Set([
+    'correctScore', 'totalGamesOU', 'exactGames', 'spreads',
+    'afterG3', 'afterG4', 'fromBehind', 'g1AndSeries'
+  ]);
+
+  function renderLiveMarketsPanel(s) {
+    if (isSeriesTBD(s)) return '';
+    if (!s.topSeed.short || !s.botSeed.short) return '';
+    let m;
+    try {
+      m = E.computeMarkets(s, workingData.defaults);
+    } catch (err) {
+      return `<div class="live-markets-panel"><div class="live-markets-header"><h3>Live Markets</h3></div><div style="color:var(--text-tertiary);font-size:12px;">Could not compute markets: ${escapeHtml(err.message)}</div></div>`;
+    }
+
+    // Order: Series Winner first (always open by default), then derived markets.
+    const cards = [
+      { key: 'seriesWinner', title: 'Series Winner',                tag: '2-Way',         kind: 'paired', market: m.seriesWinner },
+      { key: 'correctScore', title: 'Correct Score',                tag: '8-Way Exact',   kind: 'exact',  market: m.correctScore },
+      { key: 'totalGamesOU', title: 'Total Games',                  tag: 'O/U Lines',     kind: 'paired', market: m.totalGamesOU },
+      { key: 'exactGames',   title: 'Exact Games',                  tag: '4-Way',         kind: 'exact',  market: m.exactGames },
+      { key: 'spreads',      title: 'Series Spreads',               tag: '±1.5 / 2.5 / 3.5', kind: 'paired', market: m.spreads, wide: true },
+      { key: 'afterG3',      title: 'Series Score After Game 3',    tag: m.afterG3.settled ? 'SETTLED' : '4-Way', kind: 'exact', market: m.afterG3, settled: m.afterG3.settled },
+      { key: 'afterG4',      title: 'Series Score After Game 4',    tag: m.afterG4.settled ? 'SETTLED' : '5-Way', kind: 'exact', market: m.afterG4, settled: m.afterG4.settled },
+      { key: 'fromBehind',   title: 'From Behind / Never Trail',    tag: '4-Way',         kind: 'exact',  market: m.fromBehind },
+      { key: 'g1AndSeries',  title: 'Game 1 Winner / Series Winner', tag: '4-Way',        kind: 'exact',  market: m.g1AndSeries }
+    ];
+
+    const cardsHtml = cards.map(c => {
+      const collapsed = COLLAPSED_MARKETS.has(c.key);
+      const innerHtml = (c.kind === 'paired')
+        ? renderPairedMarketBody(c.market)
+        : renderExactMarketBody(c.market);
+      const tagClass = c.settled ? 'market-tag settled' : 'market-tag';
+      return `
+        <div class="market collapsible ${collapsed ? 'collapsed' : ''} ${c.wide ? 'wide' : ''}" data-market-key="${c.key}">
+          <div class="market-header" data-toggle-market="${c.key}">
+            <div class="market-title-wrap">
+              <span class="market-toggle-caret">▼</span>
+              <div class="market-title">${escapeHtml(c.title)}</div>
+            </div>
+            <div class="${tagClass}">${escapeHtml(c.tag)}</div>
+          </div>
+          <div class="market-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="live-markets-panel">
+        <div class="live-markets-header">
+          <h3>Live Markets <span class="live-markets-hint">· updates as you edit</span></h3>
+          <div class="live-markets-actions">
+            <button id="liveMarketsExpandAll" type="button">Expand all</button>
+            <button id="liveMarketsCollapseAll" type="button">Collapse all</button>
+          </div>
+        </div>
+        <div class="markets-grid">${cardsHtml}</div>
+      </div>
+    `;
+  }
+
+  function renderMarketRow(leg) {
+    const dec = E.probToDecimal(leg.offered);
+    const american = E.decimalToAmerican(dec);
+    const isFav = dec > 0 && dec < 2;
+    const muted = leg.fair < 0.001 ? 'muted' : '';
+    const current = leg.current ? 'current' : '';
+    return `
+      <div class="row ${muted} ${current}">
+        <div class="row-label">${escapeHtml(leg.label)}</div>
+        <div class="row-prob">${E.fmtPct(leg.fair)}</div>
+        <div class="row-decimal">${E.fmtDecimal(dec)}</div>
+        <div class="row-american ${isFav ? 'fav' : 'dog'}">${american}</div>
+      </div>
+    `;
+  }
+
+  function renderMarketMarginBadge(margin) {
+    return `<span class="margin-badge ${E.marginBadgeColor(margin)}">${E.fmtMargin(margin)}</span>`;
+  }
+
+  function renderPairedMarketBody(market) {
+    const pairsHtml = market.pairs.map((p, idx) => `
+      ${idx > 0 ? '<div class="pair-divider"></div>' : ''}
+      ${p.legs.map(renderMarketRow).join('')}
+      <div class="pair-margin">${renderMarketMarginBadge(p.margin)}</div>
+    `).join('');
+    return `
+      <div class="col-headers"><span>Selection</span><span>Prob</span><span>Dec</span><span>US</span></div>
+      <div class="market-body">${pairsHtml}</div>
+    `;
+  }
+
+  function renderExactMarketBody(market) {
+    const rowsHtml = market.legs.map(renderMarketRow).join('');
+    return `
+      <div class="col-headers"><span>Selection</span><span>Prob</span><span>Dec</span><span>US</span></div>
+      <div class="market-body">${rowsHtml}</div>
+      <div class="market-footer">
+        <span class="market-footer-label">Overall Margin</span>
+        ${renderMarketMarginBadge(market.overallMargin)}
+      </div>
+    `;
+  }
+
+  function wireLiveMarkets() {
+    // Toggle individual cards. Doesn't trigger renderAll() — just flips the class
+    // and updates the COLLAPSED_MARKETS set so state persists across re-renders.
+    document.querySelectorAll('[data-toggle-market]').forEach(header => {
+      header.addEventListener('click', e => {
+        const key = header.getAttribute('data-toggle-market');
+        const card = header.closest('.market');
+        const isCollapsed = card.classList.toggle('collapsed');
+        if (isCollapsed) COLLAPSED_MARKETS.add(key);
+        else COLLAPSED_MARKETS.delete(key);
+      });
+    });
+
+    const expandBtn = document.getElementById('liveMarketsExpandAll');
+    if (expandBtn) expandBtn.addEventListener('click', () => {
+      COLLAPSED_MARKETS.clear();
+      document.querySelectorAll('.live-markets-panel .market.collapsible').forEach(card => {
+        card.classList.remove('collapsed');
+      });
+    });
+    const collapseBtn = document.getElementById('liveMarketsCollapseAll');
+    if (collapseBtn) collapseBtn.addEventListener('click', () => {
+      document.querySelectorAll('.live-markets-panel .market.collapsible').forEach(card => {
+        const key = card.getAttribute('data-market-key');
+        COLLAPSED_MARKETS.add(key);
+        card.classList.add('collapsed');
+      });
+    });
+  }
+
 
   // ===== WIRE =====
   function wireMain(s) {
