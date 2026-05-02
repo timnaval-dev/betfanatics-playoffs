@@ -477,9 +477,224 @@
   .bias-unit { font-family: var(--mono); color: var(--text-tertiary); font-size: 11px; }
   .bias-empty { color: var(--text-tertiary); font-size: 11px; padding: 8px; text-align: center; }
 
+  /* CUP PRICE EDITOR (the heart of admin outrights workflow) */
+  .cup-edit-panel { margin-bottom: 24px; }
+  .cup-edit-note {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+    padding: 6px 10px; margin-bottom: 12px;
+    background: var(--bg-tertiary); border-radius: 4px;
+    border-left: 2px solid var(--accent-bright);
+  }
+  .cup-edit-grid {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cup-edit-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) 110px 90px 90px 90px 200px 36px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 2px solid var(--row-team-color, transparent);
+    background: var(--bg-tertiary);
+    transition: background 0.1s;
+  }
+  .cup-edit-row:hover { background: var(--bg-elevated, var(--bg-tertiary)); }
+  .cup-edit-row.elim { opacity: 0.4; }
+  .cup-edit-row.elim .cup-edit-team-name,
+  .cup-edit-row.elim .cup-edit-team-short { text-decoration: line-through; }
+  .cup-edit-row.overridden {
+    background: rgba(139, 92, 246, 0.06);
+  }
+  .cup-edit-team {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+  }
+  .cup-edit-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cup-edit-team-stack {
+    display: flex; flex-direction: column; min-width: 0; gap: 1px;
+  }
+  .cup-edit-team-short {
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: var(--text-primary);
+  }
+  .cup-edit-team-name {
+    font-size: 11px; color: var(--text-tertiary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cup-edit-conf-tag {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    padding: 2px 6px; border-radius: 3px; letter-spacing: 0.05em;
+    background: var(--bg-secondary); color: var(--text-tertiary);
+  }
+  .cup-edit-cell {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .cup-edit-cell label {
+    font-family: var(--mono); font-size: 9px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .cup-edit-cell.readonly .cup-edit-value {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .cup-edit-cell.readonly .cup-edit-value-elim {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+    font-style: italic;
+  }
+  .cup-edit-value-elim {
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+    font-style: italic; padding: 5px 0;
+  }
+  .cup-price-input {
+    width: 100%; padding: 5px 8px;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text-primary); text-align: center;
+  }
+  .cup-price-input:focus { outline: none; border-color: var(--accent-bright); background: var(--bg-secondary); }
+  .cup-edit-row.overridden .cup-price-input {
+    border-color: var(--accent-bright);
+    background: rgba(139, 92, 246, 0.08);
+  }
+  .cup-edit-cell.bias-cell label {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .bias-readout {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    color: var(--text-secondary); text-transform: none;
+  }
+  .cup-bias-slider {
+    width: 100%;
+  }
+  .cup-edit-actions {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-row-reset {
+    width: 28px; height: 28px; padding: 0;
+    font-size: 14px; font-weight: 700;
+    background: transparent; color: var(--text-tertiary);
+    border: 1px solid var(--border); border-radius: 4px;
+    cursor: pointer; line-height: 1;
+  }
+  .btn-row-reset:hover { color: var(--text-primary); border-color: var(--accent-bright); }
+
+  /* Override / eliminated badges shown in market display rows */
+  .override-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; line-height: 1; letter-spacing: 0.06em;
+    background: rgba(139, 92, 246, 0.18); color: rgb(167, 139, 250);
+  }
+  .elim-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; line-height: 1; letter-spacing: 0.06em;
+    background: var(--bg-secondary); color: var(--text-tertiary);
+  }
+  .row.eliminated { opacity: 0.4; }
+  .row.eliminated .outright-team-name,
+  .row.eliminated .outright-team-short { text-decoration: line-through; }
+
+  @media (max-width: 1100px) {
+    .cup-edit-row {
+      grid-template-columns: minmax(160px, 2fr) 100px 80px 80px 80px 160px 32px;
+      gap: 8px;
+    }
+  }
+  @media (max-width: 900px) {
+    .cup-edit-row {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .cup-edit-team { grid-column: 1 / -1; }
+    .cup-edit-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+
   .margin-badge {
     display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
     padding: 3px 8px; border-radius: 4px; border: 1px solid; letter-spacing: 0.04em;
+  }
+
+  /* Mode indicator + reset button (replaces mode toggle) */
+  .mode-actions { display: flex; align-items: center; gap: 10px; }
+  .mode-indicator {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 3px 8px; border-radius: 3px; letter-spacing: 0.06em;
+    background: var(--bg-tertiary); color: var(--text-secondary);
+  }
+  .mode-indicator.manual { background: rgba(245, 158, 11, 0.15); color: rgb(251, 191, 36); }
+  .btn-reset {
+    padding: 5px 11px; font-size: 11px; font-weight: 600;
+    background: transparent; color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 5px; cursor: pointer;
+    font-family: var(--display);
+  }
+  .btn-reset:hover { color: var(--text-primary); border-color: var(--accent-bright); }
+
+  .team-power-tag {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: var(--text-tertiary);
+    padding: 2px 6px; border-radius: 3px;
+    background: var(--bg-tertiary);
+    margin-left: 6px;
+  }
+
+  .panel-tag {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  .blend-feedback {
+    font-family: var(--mono); font-size: 10px; line-height: 1.4;
+    padding: 6px 10px; border-radius: 4px;
+    background: var(--bg-tertiary); color: var(--text-secondary);
+    border-left: 2px solid var(--accent-bright);
+  }
+
+  /* Bracket grid (used in outrights view) */
+  .bracket-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(140px, 1fr));
+    grid-template-rows: 28px repeat(8, minmax(60px, 1fr));
+    gap: 8px 12px;
+    min-width: 1100px;
+  }
+  .bracket-col-label {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    color: var(--text-tertiary); text-align: center; letter-spacing: 0.1em;
+    text-transform: uppercase; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    grid-row: 1; align-self: end;
+  }
+  .bracket-cell {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; cursor: pointer;
+    transition: all 0.15s; min-height: 60px; display: flex;
+    flex-direction: column; justify-content: center; gap: 4px;
+    align-self: center;
+  }
+  .bracket-cell:hover { border-color: var(--accent-bright); background: var(--bg-elevated, var(--bg-tertiary)); }
+  .bracket-cell.active { border-color: var(--accent-bright); box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
+  .bracket-cell.complete { border-color: rgb(34, 197, 94); }
+  .bracket-cell.tbd { opacity: 0.4; cursor: default; }
+  .bracket-team {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--display); font-size: 13px; font-weight: 500;
+    color: var(--cell-team-color, var(--text-primary));
+  }
+  .bracket-team.winner { color: var(--cell-team-color, rgb(34, 197, 94)); font-weight: 700; }
+  .bracket-team.eliminated { color: var(--text-disabled, var(--text-tertiary)); text-decoration: line-through; }
+  .bracket-team-score {
+    font-family: var(--mono); font-size: 14px; font-weight: 600;
+    color: var(--cell-team-color, var(--accent-bright));
+  }
+
+  .outrights-bracket-section {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-top: 24px;
+    overflow-x: auto;
+  }
+  .outrights-bracket-title {
+    font-family: var(--display); font-weight: 600; font-size: 14px;
+    color: var(--text-primary); letter-spacing: -0.01em; margin-bottom: 16px;
   }
 
   .grid {
@@ -850,8 +1065,8 @@
     const banner = document.getElementById('modifiedBanner');
     const ids = getModifiedSeriesIds();
     const biasesChanged = JSON.stringify(workingData.outrightBiases || {}) !== JSON.stringify(ORIGINAL.outrightBiases || {});
-    const blendChanged = JSON.stringify(workingData.outrightBlend || {}) !== JSON.stringify(ORIGINAL.outrightBlend || {});
-    const totalChanges = ids.length + (biasesChanged ? 1 : 0) + (blendChanged ? 1 : 0);
+    const overridesChanged = JSON.stringify(workingData.outrightOverrides || {}) !== JSON.stringify(ORIGINAL.outrightOverrides || {});
+    const totalChanges = ids.length + (biasesChanged ? 1 : 0) + (overridesChanged ? 1 : 0);
     if (totalChanges === 0) {
       banner.style.display = 'none';
       return;
@@ -859,8 +1074,8 @@
     banner.style.display = '';
     const parts = [];
     if (ids.length > 0) parts.push(`${ids.length} series`);
+    if (overridesChanged) parts.push('cup prices');
     if (biasesChanged) parts.push('biases');
-    if (blendChanged) parts.push('blend');
     document.getElementById('modifiedText').textContent =
       `${parts.join(' + ')} modified — export to apply changes`;
   }
@@ -906,31 +1121,91 @@
     wireMain(s);
   }
 
+  // ===== BRACKET BUILDER (used by outrights view) =====
+  // 7 columns × (1 header + 8 series rows). East rows 1-4, West rows 5-8.
+  // R1 cells span 1 row, R2 cells span 2, R3 cells span 4, SCF spans 8.
+  function buildBracketHTML() {
+    const wd = workingData;
+    const positions = [];
+    wd.bracket.east.r1.forEach((id, i) => positions.push({ id, col: 1, row: 2 + i, span: 1 }));
+    wd.bracket.east.r2.forEach((id, i) => positions.push({ id, col: 2, row: 2 + i * 2, span: 2 }));
+    positions.push({ id: wd.bracket.east.r3, col: 3, row: 2, span: 4 });
+    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 8 });
+    positions.push({ id: wd.bracket.west.r3, col: 5, row: 6, span: 4 });
+    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 6 + i * 2, span: 2 }));
+    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 6 + i, span: 1 }));
+
+    const labels = [
+      { col: 1, text: 'Round 1 (E)' },
+      { col: 2, text: 'Round 2 (E)' },
+      { col: 3, text: 'Conf Final (E)' },
+      { col: 4, text: 'Stanley Cup' },
+      { col: 5, text: 'Conf Final (W)' },
+      { col: 6, text: 'Round 2 (W)' },
+      { col: 7, text: 'Round 1 (W)' }
+    ];
+    let html = '<div class="bracket-grid">';
+    labels.forEach(l => {
+      html += `<div class="bracket-col-label" style="grid-column:${l.col};">${l.text}</div>`;
+    });
+    positions.forEach(p => {
+      const s = wd.series[p.id];
+      if (!s) return;
+      const top = s.topSeed.short || s.topSeed.name || 'TBD';
+      const bot = s.botSeed.short || s.botSeed.name || 'TBD';
+      const tbd = isSeriesTBD(s) ? 'tbd' : '';
+      const complete = isSeriesComplete(s) ? 'complete' : '';
+      const active = (p.id === activeSeriesId) ? 'active' : '';
+      const topClass = isSeriesComplete(s) && s.state.topWins >= 4 ? 'winner' :
+                       isSeriesComplete(s) ? 'eliminated' : '';
+      const botClass = isSeriesComplete(s) && s.state.botWins >= 4 ? 'winner' :
+                       isSeriesComplete(s) ? 'eliminated' : '';
+      const topColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.topSeed.short])
+        ? NHL_TEAMS[s.topSeed.short].home.primary : '';
+      const botColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.botSeed.short])
+        ? NHL_TEAMS[s.botSeed.short].home.primary : '';
+      html += `
+        <div class="bracket-cell ${active} ${complete} ${tbd}"
+             style="grid-column:${p.col}; grid-row:${p.row} / span ${p.span};"
+             data-bracket-id="${p.id}">
+          <div class="bracket-team ${topClass}" ${topClass !== 'eliminated' && topColor ? `style="--cell-team-color:${topColor};"` : ''}>
+            <span>${escapeHtml(top)}</span>
+            <span class="bracket-team-score">${s.state.topWins}</span>
+          </div>
+          <div class="bracket-team ${botClass}" ${botClass !== 'eliminated' && botColor ? `style="--cell-team-color:${botColor};"` : ''}>
+            <span>${escapeHtml(bot)}</span>
+            <span class="bracket-team-score">${s.state.botWins}</span>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    return html;
+  }
+
   // ===== OUTRIGHTS VIEW (admin) =====
   function renderOutrightsView() {
     const o = E.computeOutrights(workingData);
-    const blend = workingData.outrightBlend || {};
+    const overrides = (workingData.outrightOverrides && workingData.outrightOverrides.scf) || {};
     const biases = workingData.outrightBiases || { eastConf: {}, westConf: {}, scf: {} };
 
-    const renderTeamRow = (team, probField, offeredField, biasField, modelField, marketField) => {
+    // ----- Render the read-only conference / cup market cards (display only) -----
+    const renderTeamRow = (team, probField, offeredField, biasField) => {
       const fair = team[probField];
       const offered = team[offeredField];
       const dec = E.probToDecimal(offered);
       const american = E.decimalToAmerican(dec);
       const isFav = dec > 0 && dec < 2;
-      const muted = fair < 0.001 ? 'muted' : '';
+      const muted = team.eliminated ? 'muted eliminated' : (fair < 0.001 ? 'muted' : '');
       const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[team.short] : null;
       const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
       const bias = team[biasField] || 0;
-      const modelVal = team[modelField];
-      const marketVal = team[marketField];
-      const diagParts = [];
-      if (modelVal != null) diagParts.push('model ' + (modelVal * 100).toFixed(1) + '%');
-      if (marketVal != null && marketVal > 0) diagParts.push('market ' + (marketVal * 100).toFixed(1) + '%');
-      const diagText = diagParts.join(' · ');
       const biasBadge = bias !== 0
         ? `<span class="bias-badge ${bias > 0 ? 'pos' : 'neg'}">${bias > 0 ? '+' : ''}${(bias * 100).toFixed(1)}%</span>`
         : '';
+      const overrideBadge = (probField === 'fairWinStanleyCup' && team.scfOverridden)
+        ? '<span class="override-badge">SET</span>' : '';
+      const elimBadge = team.eliminated ? '<span class="elim-badge">OUT</span>' : '';
       return `
         <div class="row ${muted}" style="--row-team-color:${accent};">
           <div class="row-label outright-team">
@@ -939,20 +1214,19 @@
               <div class="outright-team-line">
                 <span class="outright-team-short">${escapeHtml(team.short)}</span>
                 <span class="outright-team-name">${escapeHtml(team.name)}</span>
-                ${biasBadge}
+                ${biasBadge}${overrideBadge}${elimBadge}
               </div>
-              ${diagText ? `<div class="outright-team-diag">${diagText}</div>` : ''}
             </div>
           </div>
-          <div class="row-prob">${E.fmtPct(fair)}</div>
-          <div class="row-decimal">${E.fmtDecimal(dec)}</div>
-          <div class="row-american ${isFav ? 'fav' : 'dog'}">${american}</div>
+          <div class="row-prob">${team.eliminated ? '—' : E.fmtPct(fair)}</div>
+          <div class="row-decimal">${team.eliminated ? '—' : E.fmtDecimal(dec)}</div>
+          <div class="row-american ${team.eliminated ? '' : (isFav ? 'fav' : 'dog')}">${team.eliminated ? '—' : american}</div>
         </div>
       `;
     };
 
-    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, biasField, modelField, marketField, totalMargin, round, wide) => {
-      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField, biasField, modelField, marketField)).join('');
+    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, biasField, totalMargin, round, wide) => {
+      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField, biasField)).join('');
       return `
         <div class="market ${wide ? 'wide' : ''}">
           <div class="market-header">
@@ -969,207 +1243,221 @@
       `;
     };
 
-    const renderBlendControl = (key, label) => {
-      const cfg = blend[key] || { enabled: false, marketWeight: 0.7, fanDuelText: '', draftKingsText: '' };
-      const fdText = cfg.fanDuelText || '';
-      const dkText = cfg.draftKingsText || '';
-      const fdCount = Object.keys(cfg.fanDuelProbs || {}).length;
-      const dkCount = Object.keys(cfg.draftKingsProbs || {}).length;
-      const mw = (typeof cfg.marketWeight === 'number') ? cfg.marketWeight : 0.7;
-      const canApply = fdText.trim().length > 0 && dkText.trim().length > 0;
-      const isActive = cfg.enabled && fdCount > 0 && dkCount > 0;
-      return `
-        <div class="blend-card ${isActive ? 'active' : ''}">
-          <div class="blend-header">
-            <div class="blend-title">${label}</div>
-            <div class="blend-status ${isActive ? 'on' : 'off'}">${isActive ? 'BLENDING' : 'MODEL ONLY'}</div>
-          </div>
-          <div class="blend-paste-grid">
-            <div class="blend-paste">
-              <label>FanDuel paste ${fdCount > 0 ? `<span class="parse-count ok">${fdCount} matched</span>` : ''}</label>
-              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="fanDuel" placeholder="Paste FanDuel odds here">${escapeHtml(fdText)}</textarea>
-            </div>
-            <div class="blend-paste">
-              <label>DraftKings paste ${dkCount > 0 ? `<span class="parse-count ok">${dkCount} matched</span>` : ''}</label>
-              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="draftKings" placeholder="Paste DraftKings odds here">${escapeHtml(dkText)}</textarea>
-            </div>
-          </div>
-          <div class="blend-controls-row">
-            <label class="blend-weight-label">Market weight: <strong id="mw-${key}">${(mw * 100).toFixed(0)}%</strong> (model: ${((1 - mw) * 100).toFixed(0)}%)</label>
-            <input type="range" min="0" max="100" step="5" value="${mw * 100}" data-blend-weight="${key}" class="blend-weight-slider">
-            <div class="blend-actions">
-              <button class="btn-recalc" data-blend-action="apply" data-blend-market="${key}" ${canApply ? '' : 'disabled'}>Recalculate</button>
-              <button class="btn-clear" data-blend-action="clear" data-blend-market="${key}">Clear</button>
-            </div>
-          </div>
-        </div>
-      `;
-    };
-
     return `
       <div class="outrights-banner">
         <div class="outrights-banner-title">Outright / Futures Markets</div>
         <div class="outrights-banner-desc">
-          Pipeline: model fair → market blend (if pasted) → liability biases → round-based margin.
-          Round automatically detected per market based on highest-numbered series with both teams populated.
-          Margin schedule: R1 10%/16% · R2 8%/12% · R3 4.5%/8% · R4 4.5%.
+          Edit Stanley Cup prices below to anchor each team's outright probability.
+          Conference winners derive automatically from the SCF column. Conference biases
+          (in 0.1pp increments) shift derived conf prices without affecting Cup prices.
+          Margins drop gradually as series complete.
         </div>
       </div>
 
-      <div class="blend-grid">
-        ${renderBlendControl('eastConf', 'East Conference Blend')}
-        ${renderBlendControl('westConf', 'West Conference Blend')}
-        ${renderBlendControl('scf', 'Stanley Cup Blend')}
-      </div>
-
-      ${renderBiasEditor(o, biases)}
+      ${renderCupPriceEditor(o, overrides, biases)}
 
       <div class="markets-grid">
-        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.eastConfMargin, o.eastRound)}
-        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.westConfMargin, o.westRound)}
-        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', 'modelFairStanleyCup', 'marketFairStanleyCup', o.scfMargin, o.scfRound, true)}
+        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.eastConfMargin, o.eastRound)}
+        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.westConfMargin, o.westRound)}
+        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', o.scfMargin, o.scfRound, true)}
+      </div>
+
+      <div class="outrights-bracket-section">
+        <div class="outrights-bracket-title">Bracket Overview</div>
+        ${buildBracketHTML()}
       </div>
     `;
   }
 
-  // Liability bias editor: per market, list teams with editable percentage point delta.
-  function renderBiasEditor(o, biases) {
-    const renderRowsForMarket = (teams, biasMap, marketKey, biasField) => {
-      return teams.filter(t => t.fairWinConference > 0.0001 || t.fairWinStanleyCup > 0.0001 || biasMap[t.short]).map(t => {
-        const bias = biasMap[t.short] || 0;
-        return `
-          <div class="bias-row">
-            <span class="bias-team">${escapeHtml(t.short)} <span class="bias-team-name">${escapeHtml(t.name)}</span></span>
-            <div class="bias-input-group">
-              <input type="number" step="0.5" data-bias-market="${marketKey}" data-bias-team="${t.short}" value="${bias !== 0 ? (bias * 100).toFixed(1) : ''}" placeholder="0">
-              <span class="bias-unit">%</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    };
+  // Stanley Cup Price editor — the heart of the outrights workflow.
+  // Each row: team identity + American odds input + read-only probability + conference bias slider.
+  // Eliminated teams are shown but not editable.
+  function renderCupPriceEditor(o, overrides, biases) {
+    // Build a per-team row from the unsorted teams array but display sorted by current Cup prob descending.
+    const rows = o.allTeamsByCup.slice().map(t => {
+      const isEast = t.conference === 'East';
+      const confBias = ((isEast ? biases.eastConf : biases.westConf) || {})[t.short] || 0;
+      const fairCupPct = (t.fairWinStanleyCup * 100).toFixed(2);
+      const offeredCupAmerican = t.eliminated ? '—' : E.decimalToAmerican(E.probToDecimal(t.offeredWinStanleyCup));
+      const fairConfPct = (t.fairWinConference * 100).toFixed(2);
+      // Display the override probability if set, otherwise the model probability rounded to American
+      const displayProb = t.scfOverridden ? t.scfOverrideRaw : t.modelFairStanleyCup;
+      const displayAmerican = (displayProb > 0 && displayProb < 1)
+        ? E.decimalToAmerican(E.probToDecimal(displayProb))
+        : '';
+      const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[t.short] : null;
+      const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
+      const elimClass = t.eliminated ? 'elim' : '';
+      const overrideClass = t.scfOverridden ? 'overridden' : '';
 
-    const eastRows = renderRowsForMarket(o.eastTeams, biases.eastConf || {}, 'eastConf', 'biasConference');
-    const westRows = renderRowsForMarket(o.westTeams, biases.westConf || {}, 'westConf', 'biasConference');
-    const scfRows  = renderRowsForMarket(o.allTeamsByCup, biases.scf || {}, 'scf', 'biasStanleyCup');
+      // Conference bias slider: 0.1pp increments, range -3pp to +3pp
+      const sliderValue = (confBias * 1000).toFixed(0); // store as 1/1000 for slider
+      const biasLabel = confBias === 0 ? '0' : ((confBias > 0 ? '+' : '') + (confBias * 100).toFixed(1));
+
+      return `
+        <div class="cup-edit-row ${elimClass} ${overrideClass}" style="--row-team-color:${accent};">
+          <div class="cup-edit-team">
+            <span class="cup-edit-dot" style="background:${accent};"></span>
+            <div class="cup-edit-team-stack">
+              <span class="cup-edit-team-short">${escapeHtml(t.short)}</span>
+              <span class="cup-edit-team-name">${escapeHtml(t.name)}</span>
+            </div>
+            <span class="cup-edit-conf-tag">${t.conference}</span>
+          </div>
+
+          <div class="cup-edit-cell">
+            <label>Cup Price</label>
+            ${t.eliminated
+              ? `<div class="cup-edit-value-elim">— eliminated —</div>`
+              : `<input type="text" class="cup-price-input" data-team="${t.short}" value="${displayAmerican}" placeholder="+500">`
+            }
+          </div>
+
+          <div class="cup-edit-cell readonly">
+            <label>Cup Prob</label>
+            <div class="cup-edit-value">${t.eliminated ? '0.00%' : fairCupPct + '%'}</div>
+          </div>
+
+          <div class="cup-edit-cell readonly">
+            <label>Cup Offered</label>
+            <div class="cup-edit-value">${t.eliminated ? '—' : offeredCupAmerican}</div>
+          </div>
+
+          <div class="cup-edit-cell readonly">
+            <label>Conf Prob</label>
+            <div class="cup-edit-value">${t.eliminated ? '0.00%' : fairConfPct + '%'}</div>
+          </div>
+
+          <div class="cup-edit-cell bias-cell">
+            <label>Conf Bias <span class="bias-readout">${biasLabel}pp</span></label>
+            ${t.eliminated
+              ? `<div class="cup-edit-value-elim">—</div>`
+              : `<input type="range" class="cup-bias-slider" data-team="${t.short}" data-conf="${t.conference}" min="-30" max="30" step="1" value="${sliderValue}">`
+            }
+          </div>
+
+          <div class="cup-edit-actions">
+            ${t.scfOverridden && !t.eliminated
+              ? `<button class="btn-row-reset" data-team="${t.short}" title="Revert to MoneyPuck">↺</button>`
+              : ''
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Cup column input total (raw, before normalization) for diagnostic
+    let userInputTotal = 0;
+    let userInputCount = 0;
+    Object.entries(overrides).forEach(([k, v]) => {
+      if (typeof v === 'number') { userInputTotal += v; userInputCount++; }
+    });
+    const totalNote = userInputCount > 0
+      ? `Override inputs sum to ${(userInputTotal * 100).toFixed(2)}% across ${userInputCount} teams (auto-renormalized to 100%)`
+      : `No price overrides set — using MoneyPuck-derived Cup probabilities`;
 
     return `
-      <div class="panel">
+      <div class="panel cup-edit-panel">
         <div class="panel-header">
-          <div class="panel-title">Liability Biases (percentage point shift, redistributed equally to unbiased teams)</div>
-          <button class="btn-clear" id="clearAllBiases">Clear All</button>
+          <div class="panel-title">Stanley Cup Prices (trader anchors)</div>
+          <button class="btn-clear" id="resetAllCupOverrides">Reset all to MoneyPuck</button>
         </div>
-        <div class="bias-grid">
-          <div class="bias-column">
-            <div class="bias-column-title">East Conference</div>
-            ${eastRows || '<div class="bias-empty">No teams in market</div>'}
-          </div>
-          <div class="bias-column">
-            <div class="bias-column-title">West Conference</div>
-            ${westRows || '<div class="bias-empty">No teams in market</div>'}
-          </div>
-          <div class="bias-column">
-            <div class="bias-column-title">Stanley Cup</div>
-            ${scfRows || '<div class="bias-empty">No teams in market</div>'}
-          </div>
+        <div class="cup-edit-note">${totalNote}</div>
+        <div class="cup-edit-grid">
+          ${rows}
         </div>
       </div>
     `;
   }
 
   function wireOutrightControls() {
-    document.querySelectorAll('.blend-textarea').forEach(ta => {
-      ta.addEventListener('input', e => {
-        const market = e.target.dataset.blendMarket;
-        const book = e.target.dataset.blendBook;
-        if (!workingData.outrightBlend) workingData.outrightBlend = {};
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        const cfg = workingData.outrightBlend[market];
-        if (book === 'fanDuel') cfg.fanDuelText = e.target.value;
-        else cfg.draftKingsText = e.target.value;
-        const card = e.target.closest('.blend-card');
-        const recalcBtn = card.querySelector('[data-blend-action="apply"]');
-        const fdHas = (cfg.fanDuelText || '').trim().length > 0;
-        const dkHas = (cfg.draftKingsText || '').trim().length > 0;
-        recalcBtn.disabled = !(fdHas && dkHas);
-        renderModifiedBanner();
-      });
-    });
-
-    document.querySelectorAll('.blend-weight-slider').forEach(sl => {
-      sl.addEventListener('input', e => {
-        const market = e.target.dataset.blendWeight;
-        const mw = parseFloat(e.target.value) / 100;
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        workingData.outrightBlend[market].marketWeight = mw;
-        const lbl = document.getElementById('mw-' + market);
-        if (lbl) lbl.textContent = (mw * 100).toFixed(0) + '%';
-        if (workingData.outrightBlend[market].enabled) renderMain();
-        renderModifiedBanner();
-      });
-    });
-
-    document.querySelectorAll('[data-blend-action]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        const action = btn.dataset.blendAction;
-        const market = btn.dataset.blendMarket;
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        const cfg = workingData.outrightBlend[market];
-        if (action === 'apply') {
-          const fdR = E.parseOddsList(cfg.fanDuelText || '');
-          const dkR = E.parseOddsList(cfg.draftKingsText || '');
-          cfg.fanDuelProbs = fdR.parsed;
-          cfg.draftKingsProbs = dkR.parsed;
-          cfg.enabled = (Object.keys(fdR.parsed).length > 0 && Object.keys(dkR.parsed).length > 0);
-          const totalUnmatched = (fdR.unmatched || []).length + (dkR.unmatched || []).length;
-          if (totalUnmatched > 0) {
-            const allUnmatched = [...(fdR.unmatched || []), ...(dkR.unmatched || [])];
-            alert('Blend applied. ' + Object.keys(fdR.parsed).length + ' FD teams + ' + Object.keys(dkR.parsed).length + ' DK teams matched.\n\nUnmatched lines:\n' + allUnmatched.join('\n'));
-          }
-        } else if (action === 'clear') {
-          cfg.enabled = false;
-          cfg.fanDuelText = '';
-          cfg.draftKingsText = '';
-          cfg.fanDuelProbs = {};
-          cfg.draftKingsProbs = {};
-        }
-        renderMain();
-        renderModifiedBanner();
-      });
-    });
-
-    // Bias inputs
-    document.querySelectorAll('[data-bias-market]').forEach(inp => {
-      inp.addEventListener('input', e => {
-        const market = e.target.dataset.biasMarket;
-        const team = e.target.dataset.biasTeam;
-        if (!workingData.outrightBiases) workingData.outrightBiases = { eastConf: {}, westConf: {}, scf: {} };
-        if (!workingData.outrightBiases[market]) workingData.outrightBiases[market] = {};
+    // Cup price input handlers: parse American odds → store probability → re-render.
+    document.querySelectorAll('.cup-price-input').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const team = e.target.dataset.team;
         const raw = e.target.value.trim();
-        if (raw === '' || raw === '0') {
-          delete workingData.outrightBiases[market][team];
+        if (!workingData.outrightOverrides) workingData.outrightOverrides = { scf: {} };
+        if (!workingData.outrightOverrides.scf) workingData.outrightOverrides.scf = {};
+        if (raw === '') {
+          // Empty → remove override, fall back to MoneyPuck
+          delete workingData.outrightOverrides.scf[team];
         } else {
-          const num = parseFloat(raw);
-          if (!isNaN(num)) workingData.outrightBiases[market][team] = num / 100;
+          const prob = E.americanInputToProb(raw);
+          if (prob === null) {
+            // Invalid input — restore previous
+            const prev = workingData.outrightOverrides.scf[team];
+            e.target.value = (typeof prev === 'number') ? E.decimalToAmerican(E.probToDecimal(prev)) : '';
+            return;
+          }
+          workingData.outrightOverrides.scf[team] = prob;
         }
-        // Re-render only the outright tables (keep input focus)
-        // For simplicity, full re-render. Focus loss is minor.
         renderMain();
         renderModifiedBanner();
-        // Try to restore focus
-        setTimeout(() => {
-          const sel = document.querySelector(`[data-bias-market="${market}"][data-bias-team="${team}"]`);
-          if (sel) { sel.focus(); sel.setSelectionRange(sel.value.length, sel.value.length); }
-        }, 0);
       });
     });
 
-    const clearBtn = document.getElementById('clearAllBiases');
-    if (clearBtn) clearBtn.addEventListener('click', () => {
-      if (!confirm('Clear all liability biases?')) return;
+    // Conference bias sliders (0.1pp increments stored as raw value/1000)
+    document.querySelectorAll('.cup-bias-slider').forEach(sl => {
+      sl.addEventListener('input', e => {
+        const team = e.target.dataset.team;
+        const conf = e.target.dataset.conf;
+        const sliderVal = parseInt(e.target.value, 10); // -30 to +30
+        const biasProb = sliderVal / 1000; // -0.030 to +0.030 (-3pp to +3pp)
+        if (!workingData.outrightBiases) workingData.outrightBiases = { eastConf: {}, westConf: {}, scf: {} };
+        const marketKey = (conf === 'East') ? 'eastConf' : 'westConf';
+        if (!workingData.outrightBiases[marketKey]) workingData.outrightBiases[marketKey] = {};
+        if (Math.abs(biasProb) < 1e-9) {
+          delete workingData.outrightBiases[marketKey][team];
+        } else {
+          workingData.outrightBiases[marketKey][team] = biasProb;
+        }
+        // Update just the readout label without full re-render to keep slider drag smooth
+        const row = e.target.closest('.cup-edit-row');
+        const readout = row.querySelector('.bias-readout');
+        if (readout) {
+          readout.textContent = (biasProb === 0 ? '0' : ((biasProb > 0 ? '+' : '') + (biasProb * 100).toFixed(1))) + 'pp';
+        }
+      });
+      // On release, do a full re-render so all derived prices update
+      sl.addEventListener('change', () => {
+        renderMain();
+        renderModifiedBanner();
+      });
+    });
+
+    // Per-row Reset buttons (revert that team's Cup price to MoneyPuck)
+    document.querySelectorAll('.btn-row-reset').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const team = e.currentTarget.dataset.team;
+        if (workingData.outrightOverrides && workingData.outrightOverrides.scf) {
+          delete workingData.outrightOverrides.scf[team];
+        }
+        renderMain();
+        renderModifiedBanner();
+      });
+    });
+
+    // Reset all overrides
+    const resetAllBtn = document.getElementById('resetAllCupOverrides');
+    if (resetAllBtn) resetAllBtn.addEventListener('click', () => {
+      if (!confirm('Reset all Stanley Cup price overrides and conference biases?')) return;
+      workingData.outrightOverrides = { scf: {} };
       workingData.outrightBiases = { eastConf: {}, westConf: {}, scf: {} };
       renderMain();
       renderModifiedBanner();
+    });
+
+    // Bracket cell clicks (in the outrights bracket section) — jump to that series
+    document.querySelectorAll('.outrights-bracket-section [data-bracket-id]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = cell.dataset.bracketId;
+        const s = workingData.series[id];
+        if (isSeriesTBD(s)) return;
+        const rd = ROUND_DEFS.find(r => r.getSeriesIds && r.getSeriesIds().includes(id));
+        if (rd) activeRound = rd.id;
+        activeSeriesId = id;
+        renderAll();
+      });
     });
   }
 
@@ -1229,23 +1517,45 @@
   }
 
   function renderIdentityPanel(s) {
-    const teams = (typeof teamsSortedByName === 'function') ? teamsSortedByName() : [];
+    const allTeams = (typeof teamsSortedByName === 'function') ? teamsSortedByName() : [];
+    // Filter to teams that can legally be slotted into this series (division for R1/R2,
+    // conference for R3, any team for SCF). Note this gives a CODE list, so we cross-reference.
+    const eligibleCodes = E.eligibleTeamsForSeries
+      ? new Set(E.eligibleTeamsForSeries(activeSeriesId))
+      : new Set(allTeams.map(t => t.short));
+    const eligibleTeams = allTeams.filter(t => eligibleCodes.has(t.short));
+
+    // Determine the constraint label for the user
+    const id = (activeSeriesId || '').toLowerCase();
+    let scopeLabel = '';
+    if (/atl/.test(id)) scopeLabel = 'Atlantic Division only';
+    else if (/met/.test(id)) scopeLabel = 'Metropolitan Division only';
+    else if (/cen/.test(id)) scopeLabel = 'Central Division only';
+    else if (/pac/.test(id)) scopeLabel = 'Pacific Division only';
+    else if (id.startsWith('e3')) scopeLabel = 'Eastern Conference only';
+    else if (id.startsWith('w3')) scopeLabel = 'Western Conference only';
+    else scopeLabel = 'Any team';
+
     const buildOptions = (currentShort, currentName) => {
       let html = `<option value="">— Empty / TBD —</option>`;
-      teams.forEach(({ short, name }) => {
+      eligibleTeams.forEach(({ short, name }) => {
         const sel = short === currentShort ? ' selected' : '';
         html += `<option value="${short}"${sel}>${escapeHtml(name)}</option>`;
       });
-      // If current short isn't in the team list, add it as a "Custom" option so we don't lose it
-      if (currentShort && !teams.find(t => t.short === currentShort)) {
-        html += `<option value="${escapeAttr(currentShort)}" selected>Custom: ${escapeHtml(currentName || currentShort)}</option>`;
+      // If the currently slotted team isn't in the eligible list (e.g., legacy data
+      // or scope mismatch), keep it as a "Custom" option so we don't drop the slot.
+      if (currentShort && !eligibleTeams.find(t => t.short === currentShort)) {
+        html += `<option value="${escapeAttr(currentShort)}" selected>⚠ Out of scope: ${escapeHtml(currentName || currentShort)}</option>`;
       }
       return html;
     };
 
     return `
       <div class="panel">
-        <div class="panel-header"><div class="panel-title">Series Identity</div></div>
+        <div class="panel-header">
+          <div class="panel-title">Series Identity</div>
+          <div class="panel-tag">${escapeHtml(scopeLabel)} (${eligibleTeams.length})</div>
+        </div>
         <div class="identity-grid" style="grid-template-columns: 1fr 1fr;">
           <div class="control-group">
             <label>Top Seed</label>
@@ -1267,121 +1577,44 @@
   }
 
   function renderInputsPanel(s) {
-    const mode = s.mode || 'auto';
-    return `
-      <div class="panel">
-        <div class="panel-header">
-          <div class="panel-title">Pricing Inputs</div>
-          <div class="mode-toggle">
-            <button class="toggle ${mode === 'derived' ? 'active' : ''}" data-mode="derived">Derived (MoneyPuck)</button>
-            <button class="toggle ${mode === 'auto' ? 'active' : ''}" data-mode="auto">Auto Sliders</button>
-            <button class="toggle ${mode === 'manual' ? 'active' : ''}" data-mode="manual">Manual Per-Game</button>
-          </div>
-        </div>
-        ${mode === 'manual' ? renderManualInputs(s) : (mode === 'derived' ? renderDerivedInputs(s) : renderAutoInputs(s))}
-      </div>
-    `;
-  }
-
-  function renderDerivedInputs(s) {
+    const mode = s.mode || 'derived';
     const teams = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : {};
     const topShort = s.topSeed && s.topSeed.short;
     const botShort = s.botSeed && s.botSeed.short;
     const tp = (topShort && teams[topShort] && teams[topShort].power) ? teams[topShort].power : null;
     const bp = (botShort && teams[botShort] && teams[botShort].power) ? teams[botShort].power : null;
-
-    if (!tp || !bp) {
-      return `
-        <div class="derived-fallback">
-          <div class="derived-fallback-title">⚠️ Falling back to Auto Sliders</div>
-          <div class="derived-fallback-desc">
-            One or both teams are TBD, so derived mode cannot compute per-game probabilities.
-            The series will price using the Auto sliders below until both teams are slotted.
-            Outright markets will still use full-derived enumeration.
-          </div>
-          ${renderAutoInputs(s)}
-        </div>
-      `;
-    }
-
-    const dPower = tp.score - bp.score;
-    const topHome = E.derivedTopWinProbForGame(topShort, botShort, true);
-    const botHome = 1 - E.derivedTopWinProbForGame(topShort, botShort, false);
-    const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+    const bothKnown = tp && bp;
 
     return `
-      <div class="derived-panel">
-        <div class="derived-formula-card">
-          <div class="derived-formula-title">Per-Game Win Probability</div>
-          <div class="derived-formula-row">
-            <span class="derived-team-tag top">${escapeHtml(topShort)}</span>
-            <span class="derived-formula-equals">Power: ${fmt(tp.score)}</span>
-            <span class="derived-component">ATW ${fmt(tp.abilityToWin)}</span>
-            <span class="derived-component">SC ${fmt(tp.scoringChances)}</span>
-            <span class="derived-component">G ${fmt(tp.goaltending)}</span>
-          </div>
-          <div class="derived-formula-row">
-            <span class="derived-team-tag bot">${escapeHtml(botShort)}</span>
-            <span class="derived-formula-equals">Power: ${fmt(bp.score)}</span>
-            <span class="derived-component">ATW ${fmt(bp.abilityToWin)}</span>
-            <span class="derived-component">SC ${fmt(bp.scoringChances)}</span>
-            <span class="derived-component">G ${fmt(bp.goaltending)}</span>
-          </div>
-          <div class="derived-formula-divider"></div>
-          <div class="derived-formula-row">
-            <span class="derived-formula-label">Power Difference</span>
-            <span class="derived-formula-value">${fmt(dPower)}</span>
-            <span class="derived-formula-note">favors ${dPower >= 0 ? topShort : botShort}</span>
-          </div>
-          <div class="derived-formula-row">
-            <span class="derived-formula-label">Home Advantage</span>
-            <span class="derived-formula-value">+4.00%</span>
-            <span class="derived-formula-note">league average</span>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Pricing Inputs</div>
+          <div class="mode-actions">
+            <span class="mode-indicator ${mode}">${mode === 'manual' ? 'MANUAL' : 'MONEYPUCK'}</span>
+            ${mode === 'manual' && bothKnown ? '<button class="btn-reset" data-action="reset-derived">Reset to MoneyPuck</button>' : ''}
           </div>
         </div>
+        ${bothKnown ? renderUnifiedGameGrid(s) : renderTBDFallback(s)}
+      </div>
+    `;
+  }
 
-        <div class="derived-output-grid">
-          <div class="derived-output-card top">
-            <div class="derived-output-label">${escapeHtml(topShort)} home win % (G1, G2, G5, G7)</div>
-            <div class="derived-output-value">${(topHome * 100).toFixed(2)}%</div>
-            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(dPower)} = ${(topHome * 100).toFixed(2)}%</div>
-          </div>
-          <div class="derived-output-card bot">
-            <div class="derived-output-label">${escapeHtml(botShort)} home win % (G3, G4, G6)</div>
-            <div class="derived-output-value">${(botHome * 100).toFixed(2)}%</div>
-            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(-dPower)} = ${(botHome * 100).toFixed(2)}%</div>
-          </div>
-        </div>
-
-        <div class="derived-source-note">
-          Source: MoneyPuck Power Rankings. Update <code>teams.js</code> in the repo to refresh.
+  function renderTBDFallback(s) {
+    return `
+      <div class="derived-fallback">
+        <div class="derived-fallback-title">⚠️ Series is TBD</div>
+        <div class="derived-fallback-desc">
+          One or both teams are not yet slotted. Set teams in the identity panel above
+          to populate per-game prices. Outright markets continue to project this series
+          using full matchup enumeration.
         </div>
       </div>
     `;
   }
 
-  function renderAutoInputs(s) {
-    return `
-      <div class="grid" style="grid-template-columns: 1fr;">
-        <div class="control-group">
-          <label>Top Seed Home Win % (G1, G2, G5, G7)</label>
-          <div class="slider-row">
-            <input type="range" id="topHomeWin" min="0" max="100" step="0.5" value="${s.auto.topHomeWinPct * 100}">
-            <div class="slider-value" id="topHomeWinValue">${(s.auto.topHomeWinPct * 100).toFixed(1)}%</div>
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Bottom Seed Home Win % (G3, G4, G6)</label>
-          <div class="slider-row">
-            <input type="range" id="botHomeWin" min="0" max="100" step="0.5" value="${s.auto.botHomeWinPct * 100}">
-            <div class="slider-value" id="botHomeWinValue">${(s.auto.botHomeWinPct * 100).toFixed(1)}%</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderManualInputs(s) {
+  // Unified per-game grid: 7 games, all editable, defaulted from MoneyPuck (derived).
+  // Editing any game switches series mode to 'manual' and persists per-game value.
+  function renderUnifiedGameGrid(s) {
     const totalPlayed = s.state.topWins + s.state.botWins;
     let gamesHtml = '';
     for (let g = 1; g <= 7; g++) {
@@ -1401,13 +1634,13 @@
           resultText = (s.botSeed.short || 'BOT') + ' WON';
         }
       }
-      const prob = s.manual['game' + g];
+      const prob = E.topWinProbForGame(s, g);
       const american = E.probToAmerican(prob);
       gamesHtml += `
         <div class="manual-game ${played ? 'played ' + resultClass : ''}">
           <div class="manual-game-label">
             <span>G${g}</span>
-            <span class="manual-game-home ${homeClass}">${homeLabel} home</span>
+            <span class="manual-game-home ${homeClass}">${escapeHtml(homeLabel)} home</span>
           </div>
           <input type="text" data-game="${g}" class="manual-input" value="${american}" ${played ? 'disabled' : ''}>
           <div class="manual-game-implied">${(prob * 100).toFixed(1)}% top</div>
@@ -1416,8 +1649,8 @@
       `;
     }
     return `
-      <div class="control-group">
-        <label>Per-Game Top Seed Win Odds (American format, e.g. -150 or +120)</label>
+      <div class="control-group" style="margin-top: 10px;">
+        <label>Per-Game Top Seed Win Odds (American) — edit any to override MoneyPuck</label>
         <div class="manual-grid">${gamesHtml}</div>
       </div>
     `;
@@ -1536,51 +1769,34 @@
     wireTeamSelect('topTeamSelect', 'topSeed');
     wireTeamSelect('botTeamSelect', 'botSeed');
 
-    // Mode toggle
-    document.querySelectorAll('.mode-toggle button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const prevMode = s.mode || 'auto';
-        const newMode = btn.dataset.mode;
-        if (prevMode === newMode) return;
-        s.mode = newMode;
-        if (newMode === 'manual') {
-          const seriesInPrevMode = Object.assign({}, s, { mode: prevMode });
-          for (let g = 1; g <= 7; g++) {
-            s.manual['game' + g] = E.topWinProbForGame(seriesInPrevMode, g);
-          }
-        }
-        renderMain();
-        renderModifiedBanner();
-      });
-    });
-
-    // Sliders
-    const topHome = document.getElementById('topHomeWin');
-    if (topHome) topHome.addEventListener('input', e => {
-      s.auto.topHomeWinPct = parseFloat(e.target.value) / 100;
-      document.getElementById('topHomeWinValue').textContent = (s.auto.topHomeWinPct * 100).toFixed(1) + '%';
-      renderModifiedBanner();
-    });
-    const botHome = document.getElementById('botHomeWin');
-    if (botHome) botHome.addEventListener('input', e => {
-      s.auto.botHomeWinPct = parseFloat(e.target.value) / 100;
-      document.getElementById('botHomeWinValue').textContent = (s.auto.botHomeWinPct * 100).toFixed(1) + '%';
+    // Reset to MoneyPuck button (only present when mode === 'manual')
+    const resetBtn = document.querySelector('[data-action="reset-derived"]');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      s.mode = 'derived';
+      renderMain();
       renderModifiedBanner();
     });
 
-    // Manual inputs
+    // Per-game inputs: editing any game switches series to manual mode and
+    // seeds all 7 game values from the previously active mode.
     document.querySelectorAll('.manual-input').forEach(inp => {
       inp.addEventListener('change', e => {
         const game = parseInt(e.target.dataset.game, 10);
         const american = e.target.value.trim();
         const prob = E.americanToProb(american);
-        if (prob !== null) {
-          s.manual['game' + game] = prob;
-          renderMain();
-          renderModifiedBanner();
-        } else {
-          e.target.value = E.probToAmerican(s.manual['game' + game]);
+        if (prob === null || isNaN(prob)) {
+          e.target.value = E.probToAmerican(E.topWinProbForGame(s, game));
+          return;
         }
+        if (s.mode !== 'manual') {
+          for (let g = 1; g <= 7; g++) {
+            s.manual['game' + g] = E.topWinProbForGame(s, g);
+          }
+          s.mode = 'manual';
+        }
+        s.manual['game' + game] = prob;
+        renderMain();
+        renderModifiedBanner();
       });
     });
 
@@ -1606,8 +1822,8 @@
       s.state.history.push([s.state.topWins, s.state.botWins]);
       renderAll();
     });
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) resetBtn.addEventListener('click', () => {
+    const resetStateBtn = document.getElementById('resetBtn');
+    if (resetStateBtn) resetStateBtn.addEventListener('click', () => {
       if (!confirm('Reset this series to 0-0?')) return;
       s.state.topWins = 0;
       s.state.botWins = 0;

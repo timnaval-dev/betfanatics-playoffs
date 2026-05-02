@@ -400,6 +400,14 @@
   }
   .bias-badge.pos { background: rgba(34, 197, 94, 0.15); color: rgb(74, 222, 128); }
   .bias-badge.neg { background: rgba(239, 68, 68, 0.15); color: rgb(248, 113, 113); }
+  .elim-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px; line-height: 1; letter-spacing: 0.06em;
+    background: var(--bg-tertiary); color: var(--text-tertiary);
+  }
+  .row.eliminated { opacity: 0.4; }
+  .row.eliminated .outright-team-name,
+  .row.eliminated .outright-team-short { text-decoration: line-through; }
 
   /* BLEND CONTROLS */
   .blend-grid {
@@ -654,7 +662,7 @@
     grid-column: 1 / -1;
   }
 
-  /* BRACKET VIEW */
+  /* BRACKET VIEW (proper bracket layout with row spans) */
   .bracket-view {
     background: var(--bg-secondary); border: 1px solid var(--border);
     border-radius: 12px; padding: 24px; margin-bottom: 24px;
@@ -663,23 +671,24 @@
   .bracket-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(140px, 1fr));
-    gap: 12px;
+    grid-template-rows: 28px repeat(8, minmax(60px, 1fr));
+    gap: 8px 12px;
     min-width: 1100px;
-  }
-  .bracket-col {
-    display: flex; flex-direction: column; gap: 12px;
   }
   .bracket-col-label {
     font-family: var(--mono); font-size: 10px; font-weight: 600;
     color: var(--text-tertiary); text-align: center; letter-spacing: 0.1em;
-    text-transform: uppercase; padding-bottom: 8px;
-    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    text-transform: uppercase; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    grid-row: 1;
+    align-self: end;
   }
   .bracket-cell {
     background: var(--bg-tertiary); border: 1px solid var(--border);
     border-radius: 8px; padding: 10px 12px; cursor: pointer;
-    transition: all 0.15s; min-height: 70px; display: flex;
+    transition: all 0.15s; min-height: 60px; display: flex;
     flex-direction: column; justify-content: center; gap: 4px;
+    align-self: center;
   }
   .bracket-cell:hover { border-color: var(--accent); background: var(--bg-elevated); }
   .bracket-cell.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
@@ -696,7 +705,21 @@
     font-family: var(--mono); font-size: 14px; font-weight: 600;
     color: var(--cell-team-color, var(--accent-bright));
   }
-  .bracket-spacer { flex: 1; }
+
+  /* OUTRIGHTS BRACKET SECTION */
+  .outrights-bracket-section {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-top: 24px;
+    overflow-x: auto;
+  }
+  .outrights-bracket-title {
+    font-family: var(--display); font-weight: 600; font-size: 14px;
+    color: var(--text-primary); letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+  .outrights-bracket-section .bracket-grid {
+    margin-bottom: 0;
+  }
 
   /* FOOTER */
   .footer {
@@ -850,72 +873,116 @@
   }
 
   // ===== RENDER: bracket view =====
-  function renderBracket() {
-    const el = document.getElementById('bracketGrid');
-    el.innerHTML = '';
-    // Columns: R1 East, R2 East, ECF, SCF, WCF, R2 West, R1 West
-    const cols = [
-      { label: 'Round 1 (E)', ids: workingData.bracket.east.r1 },
-      { label: 'Round 2 (E)', ids: workingData.bracket.east.r2 },
-      { label: 'Conf Final (E)', ids: [workingData.bracket.east.r3] },
-      { label: 'Stanley Cup', ids: [workingData.bracket.final] },
-      { label: 'Conf Final (W)', ids: [workingData.bracket.west.r3] },
-      { label: 'Round 2 (W)', ids: workingData.bracket.west.r2 },
-      { label: 'Round 1 (W)', ids: workingData.bracket.west.r1 }
+  // Build the bracket grid as an HTML string with proper row-span placement.
+  // 7 columns × (1 header + 8 series rows). East is rows 1-4, West is rows 5-8.
+  // R1 cells span 1 row, R2 cells span 2, R3 cells span 4, SCF spans 8.
+  function buildBracketHTML() {
+    const wd = workingData;
+    // Position table: { id, col (1-7), rowStart (2-9, accounting for header row), rowSpan }
+    const positions = [];
+    // East R1 (col 1, rows 2-5)
+    wd.bracket.east.r1.forEach((id, i) => positions.push({ id, col: 1, row: 2 + i, span: 1 }));
+    // East R2 (col 2, each spans 2 rows starting at row 2 and row 4)
+    wd.bracket.east.r2.forEach((id, i) => positions.push({ id, col: 2, row: 2 + i * 2, span: 2 }));
+    // East R3 (col 3, spans rows 2-5 = 4 rows)
+    positions.push({ id: wd.bracket.east.r3, col: 3, row: 2, span: 4 });
+    // SCF (col 4, spans rows 2-9 = 8 rows)
+    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 8 });
+    // West R3 (col 5, spans rows 6-9 = 4 rows)
+    positions.push({ id: wd.bracket.west.r3, col: 5, row: 6, span: 4 });
+    // West R2 (col 6, each spans 2 rows starting at row 6 and row 8)
+    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 6 + i * 2, span: 2 }));
+    // West R1 (col 7, rows 6-9)
+    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 6 + i, span: 1 }));
+
+    const labels = [
+      { col: 1, text: 'Round 1 (E)' },
+      { col: 2, text: 'Round 2 (E)' },
+      { col: 3, text: 'Conf Final (E)' },
+      { col: 4, text: 'Stanley Cup' },
+      { col: 5, text: 'Conf Final (W)' },
+      { col: 6, text: 'Round 2 (W)' },
+      { col: 7, text: 'Round 1 (W)' }
     ];
-    cols.forEach(c => {
-      const colEl = document.createElement('div');
-      colEl.className = 'bracket-col';
-      const lbl = document.createElement('div');
-      lbl.className = 'bracket-col-label';
-      lbl.textContent = c.label;
-      colEl.appendChild(lbl);
-      c.ids.forEach(id => {
-        const s = workingData.series[id];
-        const cell = document.createElement('div');
-        cell.className = 'bracket-cell';
-        if (id === activeSeriesId) cell.classList.add('active');
-        if (isSeriesComplete(s)) cell.classList.add('complete');
-        if (isSeriesTBD(s)) cell.classList.add('tbd');
-        const top = s.topSeed.short || s.topSeed.name || 'TBD';
-        const bot = s.botSeed.short || s.botSeed.name || 'TBD';
-        const topClass = isSeriesComplete(s) && s.state.topWins >= 4 ? 'winner' :
-                         isSeriesComplete(s) ? 'eliminated' : '';
-        const botClass = isSeriesComplete(s) && s.state.botWins >= 4 ? 'winner' :
-                         isSeriesComplete(s) ? 'eliminated' : '';
-        const topTeamColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.topSeed.short])
-          ? NHL_TEAMS[s.topSeed.short].home.primary : 'var(--text-primary)';
-        const botTeamColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.botSeed.short])
-          ? NHL_TEAMS[s.botSeed.short].home.primary : 'var(--text-primary)';
-        cell.innerHTML = `
-          <div class="bracket-team ${topClass}" style="${topClass === 'eliminated' ? '' : '--cell-team-color:' + topTeamColor + ';'}">
-            <span>${top}</span>
+
+    let html = '<div class="bracket-grid">';
+    labels.forEach(l => {
+      html += `<div class="bracket-col-label" style="grid-column:${l.col};">${l.text}</div>`;
+    });
+    positions.forEach(p => {
+      const s = wd.series[p.id];
+      if (!s) return;
+      const top = s.topSeed.short || s.topSeed.name || 'TBD';
+      const bot = s.botSeed.short || s.botSeed.name || 'TBD';
+      const tbd = isSeriesTBD(s) ? 'tbd' : '';
+      const complete = isSeriesComplete(s) ? 'complete' : '';
+      const active = (p.id === activeSeriesId) ? 'active' : '';
+      const topClass = isSeriesComplete(s) && s.state.topWins >= 4 ? 'winner' :
+                       isSeriesComplete(s) ? 'eliminated' : '';
+      const botClass = isSeriesComplete(s) && s.state.botWins >= 4 ? 'winner' :
+                       isSeriesComplete(s) ? 'eliminated' : '';
+      const topColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.topSeed.short])
+        ? NHL_TEAMS[s.topSeed.short].home.primary : '';
+      const botColor = (typeof NHL_TEAMS !== 'undefined' && NHL_TEAMS[s.botSeed.short])
+        ? NHL_TEAMS[s.botSeed.short].home.primary : '';
+      html += `
+        <div class="bracket-cell ${active} ${complete} ${tbd}"
+             style="grid-column:${p.col}; grid-row:${p.row} / span ${p.span};"
+             data-bracket-id="${p.id}">
+          <div class="bracket-team ${topClass}" ${topClass !== 'eliminated' && topColor ? `style="--cell-team-color:${topColor};"` : ''}>
+            <span>${escapeHtml(top)}</span>
             <span class="bracket-team-score">${s.state.topWins}</span>
           </div>
-          <div class="bracket-team ${botClass}" style="${botClass === 'eliminated' ? '' : '--cell-team-color:' + botTeamColor + ';'}">
-            <span>${bot}</span>
+          <div class="bracket-team ${botClass}" ${botClass !== 'eliminated' && botColor ? `style="--cell-team-color:${botColor};"` : ''}>
+            <span>${escapeHtml(bot)}</span>
             <span class="bracket-team-score">${s.state.botWins}</span>
           </div>
-        `;
-        cell.addEventListener('click', () => {
-          if (isSeriesTBD(s)) return;
-          // Find which round contains this series
-          const rd = ROUND_DEFS.find(r => r.getSeriesIds().includes(id));
-          if (rd) activeRound = rd.id;
-          activeSeriesId = id;
-          bracketVisible = false;
-          renderAll();
-        });
-        // Add filler to push the next pair into view
-        colEl.appendChild(cell);
-        // Add spacer between cells
-        const spacer = document.createElement('div');
-        spacer.className = 'bracket-spacer';
-        colEl.appendChild(spacer);
+        </div>
+      `;
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Render bracket into the right-rail panel (existing toggle).
+  function renderBracket() {
+    const el = document.getElementById('bracketView');
+    el.innerHTML = buildBracketHTML();
+    // Wire click handlers
+    el.querySelectorAll('[data-bracket-id]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = cell.dataset.bracketId;
+        const s = workingData.series[id];
+        if (isSeriesTBD(s)) return;
+        const rd = ROUND_DEFS.find(r => r.getSeriesIds && r.getSeriesIds().includes(id));
+        if (rd) activeRound = rd.id;
+        activeSeriesId = id;
+        bracketVisible = false;
+        renderAll();
       });
-      el.appendChild(colEl);
     });
   }
+
+  // Inline bracket for the outrights view (returns HTML string, wired separately)
+  function renderBracketViewInline() {
+    return buildBracketHTML();
+  }
+
+  // Wire up clickable bracket cells inside the outrights tab inline bracket.
+  function wireInlineBracket() {
+    document.querySelectorAll('.outrights-bracket-section [data-bracket-id]').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = cell.dataset.bracketId;
+        const s = workingData.series[id];
+        if (isSeriesTBD(s)) return;
+        const rd = ROUND_DEFS.find(r => r.getSeriesIds && r.getSeriesIds().includes(id));
+        if (rd) activeRound = rd.id;
+        activeSeriesId = id;
+        renderAll();
+      });
+    });
+  }
+
 
   // ===== RENDER: main content =====
   function renderMain() {
@@ -926,6 +993,7 @@
     if (rd && rd.isOutrights) {
       el.innerHTML = renderOutrightsView();
       wireOutrightControls();
+      wireInlineBracket();
       return;
     }
 
@@ -965,134 +1033,69 @@
 
   // ===== RENDER: controls =====
   function renderControls(s) {
-    const mode = s.mode || 'auto';
-    return `
-      <div class="controls">
-        <div class="controls-header">
-          <div class="controls-title">${s.label} — Pricing Inputs</div>
-          <div class="mode-toggle">
-            <button class="toggle ${mode === 'derived' ? 'active' : ''}" data-mode="derived">Derived (MoneyPuck)</button>
-            <button class="toggle ${mode === 'auto' ? 'active' : ''}" data-mode="auto">Auto (Sliders)</button>
-            <button class="toggle ${mode === 'manual' ? 'active' : ''}" data-mode="manual">Manual (Per Game)</button>
-          </div>
-        </div>
-        ${mode === 'manual' ? renderManualInputs(s) : (mode === 'derived' ? renderDerivedInputs(s) : renderAutoInputs(s))}
-      </div>
-    `;
-  }
-
-  function renderDerivedInputs(s) {
+    const mode = s.mode || 'derived';
     const teams = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : {};
     const topShort = s.topSeed && s.topSeed.short;
     const botShort = s.botSeed && s.botSeed.short;
     const tp = (topShort && teams[topShort] && teams[topShort].power) ? teams[topShort].power : null;
     const bp = (botShort && teams[botShort] && teams[botShort].power) ? teams[botShort].power : null;
-
-    if (!tp || !bp) {
-      return `
-        <div class="derived-fallback">
-          <div class="derived-fallback-title">⚠️ Falling back to Auto sliders</div>
-          <div class="derived-fallback-desc">
-            One or both teams are TBD, so derived mode can't compute per-game probabilities yet.
-            The series will still price using the Auto sliders below until both teams are slotted.
-          </div>
-          ${renderAutoInputs(s)}
-        </div>
-      `;
-    }
-
-    const dPower = tp.score - bp.score;
-    const topHome = E.derivedTopWinProbForGame(topShort, botShort, true);
-    const botHome = 1 - E.derivedTopWinProbForGame(topShort, botShort, false);
-    const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+    const bothKnown = tp && bp;
 
     return `
-      <div class="derived-panel">
-        <div class="derived-formula-card">
-          <div class="derived-formula-title">Per-Game Win Probability</div>
-          <div class="derived-formula-row">
-            <span class="derived-team-tag top">${escapeHtml(topShort)}</span>
-            <span class="derived-formula-equals">Power: ${fmt(tp.score)}</span>
-            <span class="derived-component">ATW ${fmt(tp.abilityToWin)}</span>
-            <span class="derived-component">SC ${fmt(tp.scoringChances)}</span>
-            <span class="derived-component">G ${fmt(tp.goaltending)}</span>
-          </div>
-          <div class="derived-formula-row">
-            <span class="derived-team-tag bot">${escapeHtml(botShort)}</span>
-            <span class="derived-formula-equals">Power: ${fmt(bp.score)}</span>
-            <span class="derived-component">ATW ${fmt(bp.abilityToWin)}</span>
-            <span class="derived-component">SC ${fmt(bp.scoringChances)}</span>
-            <span class="derived-component">G ${fmt(bp.goaltending)}</span>
-          </div>
-          <div class="derived-formula-divider"></div>
-          <div class="derived-formula-row">
-            <span class="derived-formula-label">Power Difference</span>
-            <span class="derived-formula-value">${fmt(dPower)}</span>
-            <span class="derived-formula-note">favors ${dPower >= 0 ? topShort : botShort}</span>
-          </div>
-          <div class="derived-formula-row">
-            <span class="derived-formula-label">Home Advantage</span>
-            <span class="derived-formula-value">+4.00%</span>
-            <span class="derived-formula-note">league average</span>
+      <div class="controls">
+        <div class="controls-header">
+          <div class="controls-title">${s.label} — Pricing Inputs</div>
+          <div class="mode-actions">
+            <span class="mode-indicator ${mode}">${mode === 'manual' ? 'MANUAL' : 'MONEYPUCK'}</span>
+            ${mode === 'manual' && bothKnown ? '<button class="btn-reset" data-action="reset-derived">Reset to MoneyPuck</button>' : ''}
           </div>
         </div>
-
-        <div class="derived-output-grid">
-          <div class="derived-output-card top">
-            <div class="derived-output-label">${escapeHtml(topShort)} home win % (G1, G2, G5, G7)</div>
-            <div class="derived-output-value">${(topHome * 100).toFixed(2)}%</div>
-            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(dPower)} = ${(topHome * 100).toFixed(2)}%</div>
-          </div>
-          <div class="derived-output-card bot">
-            <div class="derived-output-label">${escapeHtml(botShort)} home win % (G3, G4, G6)</div>
-            <div class="derived-output-value">${(botHome * 100).toFixed(2)}%</div>
-            <div class="derived-output-formula">0.50 + 0.04 + ${fmt(-dPower)} = ${(botHome * 100).toFixed(2)}%</div>
-          </div>
-        </div>
-
-        <div class="derived-source-note">
-          Source: MoneyPuck Power Rankings. Update <code>teams.js</code> to refresh.
-        </div>
+        ${renderTeamIdentity(s, tp, bp)}
+        ${bothKnown ? renderUnifiedGameGrid(s) : renderTBDFallback(s)}
       </div>
     `;
   }
 
-  function renderAutoInputs(s) {
+  function renderTeamIdentity(s, tp, bp) {
+    const fmt = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
     return `
-      <div class="controls-grid">
+      <div class="identity-grid">
         <div class="control-group">
           <label>Top Seed (Home: G1, G2, G5, G7)</label>
           <div class="team-input">
             <span class="team-dot top"></span>
-            <input type="text" id="topName" value="${escapeHtml(s.topSeed.name)}">
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Top Seed Home Win %</label>
-          <div class="slider-row">
-            <input type="range" id="topHomeWin" min="0" max="100" step="0.5" value="${s.auto.topHomeWinPct * 100}">
-            <div class="slider-value" id="topHomeWinValue">${(s.auto.topHomeWinPct * 100).toFixed(1)}%</div>
+            <input type="text" id="topName" value="${escapeHtml(s.topSeed.name || '')}">
+            ${tp ? `<span class="team-power-tag">${fmt(tp.score)}</span>` : ''}
           </div>
         </div>
         <div class="control-group">
           <label>Bottom Seed (Home: G3, G4, G6)</label>
           <div class="team-input">
             <span class="team-dot bot"></span>
-            <input type="text" id="botName" value="${escapeHtml(s.botSeed.name)}">
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Bottom Seed Home Win %</label>
-          <div class="slider-row">
-            <input type="range" id="botHomeWin" min="0" max="100" step="0.5" value="${s.auto.botHomeWinPct * 100}">
-            <div class="slider-value" id="botHomeWinValue">${(s.auto.botHomeWinPct * 100).toFixed(1)}%</div>
+            <input type="text" id="botName" value="${escapeHtml(s.botSeed.name || '')}">
+            ${bp ? `<span class="team-power-tag">${fmt(bp.score)}</span>` : ''}
           </div>
         </div>
       </div>
     `;
   }
 
-  function renderManualInputs(s) {
+  function renderTBDFallback(s) {
+    return `
+      <div class="derived-fallback">
+        <div class="derived-fallback-title">⚠️ Series is TBD</div>
+        <div class="derived-fallback-desc">
+          One or both teams are not yet slotted. Per-game prices will populate once
+          both teams are assigned. Outright markets continue to project this series
+          using full matchup enumeration.
+        </div>
+      </div>
+    `;
+  }
+
+  // Unified per-game grid: 7 games, all editable, defaulted from MoneyPuck (derived).
+  // Editing any game switches series mode to 'manual' and persists the per-game value.
+  function renderUnifiedGameGrid(s) {
     const totalPlayed = s.state.topWins + s.state.botWins;
     let gamesHtml = '';
     for (let g = 1; g <= 7; g++) {
@@ -1112,13 +1115,14 @@
           resultText = (s.botSeed.short || 'BOT') + ' WON';
         }
       }
-      const prob = s.manual['game' + g];
+      // Get the current per-game prob from whatever mode is active
+      const prob = E.topWinProbForGame(s, g);
       const american = E.probToAmerican(prob);
       gamesHtml += `
         <div class="manual-game ${played ? 'played ' + resultClass : ''}">
           <div class="manual-game-label">
             <span>G${g}</span>
-            <span class="manual-game-home ${homeClass}">${homeLabel} home</span>
+            <span class="manual-game-home ${homeClass}">${escapeHtml(homeLabel)} home</span>
           </div>
           <input type="text" data-game="${g}" class="manual-input" value="${american}" ${played ? 'disabled' : ''}>
           <div class="manual-game-implied">${(prob * 100).toFixed(1)}% top</div>
@@ -1127,28 +1131,15 @@
       `;
     }
     return `
-      <div class="controls-grid" style="margin-bottom: 16px; grid-template-columns: 1fr; max-width: 50%;">
-        <div class="control-group">
-          <label>Top Seed</label>
-          <div class="team-input">
-            <span class="team-dot top"></span>
-            <input type="text" id="topName" value="${escapeHtml(s.topSeed.name)}">
-          </div>
-        </div>
-        <div class="control-group">
-          <label>Bottom Seed</label>
-          <div class="team-input">
-            <span class="team-dot bot"></span>
-            <input type="text" id="botName" value="${escapeHtml(s.botSeed.name)}">
-          </div>
-        </div>
-      </div>
-      <div class="control-group">
-        <label>Per-Game Top Seed Win Odds (American) — change any to update all markets</label>
+      <div class="control-group" style="margin-top: 10px;">
+        <label>Per-Game Top Seed Win Odds (American) — edit any to override MoneyPuck</label>
         <div class="manual-grid">${gamesHtml}</div>
       </div>
     `;
   }
+
+
+
 
   // ===== RENDER: state panel =====
   function renderStatePanel(s) {
@@ -1230,31 +1221,23 @@
   // ===== RENDER: outrights / futures view =====
   function renderOutrightsView() {
     const o = E.computeOutrights(workingData);
-    const blend = workingData.outrightBlend || {};
-    const biases = workingData.outrightBiases || {};
 
-    const renderTeamRow = (team, probField, offeredField, biasField, modelField, marketField) => {
+    const renderTeamRow = (team, probField, offeredField, biasField) => {
       const fair = team[probField];
       const offered = team[offeredField];
       const dec = E.probToDecimal(offered);
       const american = E.decimalToAmerican(dec);
       const isFav = dec > 0 && dec < 2;
-      const muted = fair < 0.001 ? 'muted' : '';
+      const muted = team.eliminated ? 'muted eliminated' : (fair < 0.001 ? 'muted' : '');
       const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[team.short] : null;
       const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
       const bias = team[biasField] || 0;
-      const modelVal = team[modelField];
-      const marketVal = team[marketField];
 
-      // Diagnostic line under team name (small text)
-      const diagParts = [];
-      if (modelVal != null) diagParts.push('model ' + (modelVal * 100).toFixed(1) + '%');
-      if (marketVal != null && marketVal > 0) diagParts.push('market ' + (marketVal * 100).toFixed(1) + '%');
-      const diagText = diagParts.length > 0 ? diagParts.join(' · ') : '';
-
+      // Pricing page: bias badges shown for transparency, but no editing surface.
       const biasBadge = bias !== 0
         ? `<span class="bias-badge ${bias > 0 ? 'pos' : 'neg'}">${bias > 0 ? '+' : ''}${(bias * 100).toFixed(1)}%</span>`
         : '';
+      const elimBadge = team.eliminated ? '<span class="elim-badge">OUT</span>' : '';
 
       return `
         <div class="row ${muted}" style="--row-team-color:${accent};">
@@ -1264,20 +1247,19 @@
               <div class="outright-team-line">
                 <span class="outright-team-short">${escapeHtml(team.short)}</span>
                 <span class="outright-team-name">${escapeHtml(team.name)}</span>
-                ${biasBadge}
+                ${biasBadge}${elimBadge}
               </div>
-              ${diagText ? `<div class="outright-team-diag">${diagText}</div>` : ''}
             </div>
           </div>
-          <div class="row-prob">${E.fmtPct(fair)}</div>
-          <div class="row-decimal">${E.fmtDecimal(dec)}</div>
-          <div class="row-american ${isFav ? 'fav' : 'dog'}">${american}</div>
+          <div class="row-prob">${team.eliminated ? '—' : E.fmtPct(fair)}</div>
+          <div class="row-decimal">${team.eliminated ? '—' : E.fmtDecimal(dec)}</div>
+          <div class="row-american ${team.eliminated ? '' : (isFav ? 'fav' : 'dog')}">${team.eliminated ? '—' : american}</div>
         </div>
       `;
     };
 
-    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, biasField, modelField, marketField, totalMargin, round, wide) => {
-      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField, biasField, modelField, marketField)).join('');
+    const renderOutrightCard = (title, subtitle, teams, probField, offeredField, biasField, totalMargin, round, wide) => {
+      const rowsHtml = teams.map(t => renderTeamRow(t, probField, offeredField, biasField)).join('');
       return `
         <div class="market ${wide ? 'wide' : ''}">
           <div class="market-header">
@@ -1294,132 +1276,33 @@
       `;
     };
 
-    // ----- Blend control card (per market) -----
-    const renderBlendControl = (key, label) => {
-      const cfg = blend[key] || { enabled: false, marketWeight: 0.7, fanDuelText: '', draftKingsText: '' };
-      const fdText = cfg.fanDuelText || '';
-      const dkText = cfg.draftKingsText || '';
-      const fdCount = Object.keys(cfg.fanDuelProbs || {}).length;
-      const dkCount = Object.keys(cfg.draftKingsProbs || {}).length;
-      const mw = (typeof cfg.marketWeight === 'number') ? cfg.marketWeight : 0.7;
-      const canApply = fdText.trim().length > 0 && dkText.trim().length > 0;
-      const isActive = cfg.enabled && fdCount > 0 && dkCount > 0;
-
-      return `
-        <div class="blend-card ${isActive ? 'active' : ''}">
-          <div class="blend-header">
-            <div class="blend-title">${label}</div>
-            <div class="blend-status ${isActive ? 'on' : 'off'}">${isActive ? 'BLENDING' : 'MODEL ONLY'}</div>
-          </div>
-          <div class="blend-paste-grid">
-            <div class="blend-paste">
-              <label>FanDuel paste ${fdCount > 0 ? `<span class="parse-count ok">${fdCount} matched</span>` : ''}</label>
-              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="fanDuel" placeholder="Paste FanDuel odds here&#10;e.g.&#10;Carolina Hurricanes  +105&#10;Buffalo Sabres  +450">${escapeHtml(fdText)}</textarea>
-            </div>
-            <div class="blend-paste">
-              <label>DraftKings paste ${dkCount > 0 ? `<span class="parse-count ok">${dkCount} matched</span>` : ''}</label>
-              <textarea class="blend-textarea" data-blend-market="${key}" data-blend-book="draftKings" placeholder="Paste DraftKings odds here">${escapeHtml(dkText)}</textarea>
-            </div>
-          </div>
-          <div class="blend-controls-row">
-            <label class="blend-weight-label">Market weight: <strong id="mw-${key}">${(mw * 100).toFixed(0)}%</strong> (model: ${((1 - mw) * 100).toFixed(0)}%)</label>
-            <input type="range" min="0" max="100" step="5" value="${mw * 100}" data-blend-weight="${key}" class="blend-weight-slider">
-            <div class="blend-actions">
-              <button class="btn-recalc" data-blend-action="apply" data-blend-market="${key}" ${canApply ? '' : 'disabled'}>Recalculate</button>
-              <button class="btn-clear" data-blend-action="clear" data-blend-market="${key}">Clear</button>
-            </div>
-          </div>
-        </div>
-      `;
-    };
-
     return `
       <div class="outrights-banner">
         <div class="outrights-banner-title">Outright / Futures Markets</div>
         <div class="outrights-banner-desc">
-          Conference and Stanley Cup winner odds. Margins step down by round automatically
-          (R1: 10%/16% · R2: 8%/12% · R3: 4.5%/8% · R4: 4.5%). Paste FanDuel + DraftKings
-          odds below to blend market prices into the model. Active biases from admin show
-          as badges next to teams.
+          Conference and Stanley Cup winner odds. Stanley Cup probabilities anchor on
+          trader-set targets (configured in admin); conference winners derive from those.
+          Margins step down gradually as each series ends. Update per-game prices or
+          mark wins/losses on the series tabs to recompute the column.
         </div>
       </div>
 
-      <div class="blend-grid">
-        ${renderBlendControl('eastConf', 'East Conference Blend')}
-        ${renderBlendControl('westConf', 'West Conference Blend')}
-        ${renderBlendControl('scf', 'Stanley Cup Blend')}
+      <div class="markets-grid">
+        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.eastConfMargin, o.eastRound)}
+        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.westConfMargin, o.westRound)}
+        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', o.scfMargin, o.scfRound, true)}
       </div>
 
-      <div class="markets-grid">
-        ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.eastConfMargin, o.eastRound)}
-        ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', 'modelFairConference', 'marketFairConference', o.westConfMargin, o.westRound)}
-        ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', 'modelFairStanleyCup', 'marketFairStanleyCup', o.scfMargin, o.scfRound, true)}
+      <div class="outrights-bracket-section">
+        <div class="outrights-bracket-title">Bracket Overview</div>
+        ${renderBracketViewInline()}
       </div>
     `;
   }
 
-  // Wire up the blend controls inside the outrights view (call after each render)
+  // Pricing page is read-only for outrights — no controls to wire.
   function wireOutrightControls() {
-    document.querySelectorAll('.blend-textarea').forEach(ta => {
-      ta.addEventListener('input', e => {
-        const market = e.target.dataset.blendMarket;
-        const book = e.target.dataset.blendBook;
-        if (!workingData.outrightBlend) workingData.outrightBlend = {};
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        const cfg = workingData.outrightBlend[market];
-        if (book === 'fanDuel') cfg.fanDuelText = e.target.value;
-        else cfg.draftKingsText = e.target.value;
-        // Enable Recalculate button when both have content
-        const card = e.target.closest('.blend-card');
-        const recalcBtn = card.querySelector('[data-blend-action="apply"]');
-        const fdHas = (cfg.fanDuelText || '').trim().length > 0;
-        const dkHas = (cfg.draftKingsText || '').trim().length > 0;
-        recalcBtn.disabled = !(fdHas && dkHas);
-      });
-    });
-
-    document.querySelectorAll('.blend-weight-slider').forEach(sl => {
-      sl.addEventListener('input', e => {
-        const market = e.target.dataset.blendWeight;
-        const mw = parseFloat(e.target.value) / 100;
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        workingData.outrightBlend[market].marketWeight = mw;
-        const lbl = document.getElementById('mw-' + market);
-        if (lbl) lbl.textContent = (mw * 100).toFixed(0) + '%';
-        // If blend already active, re-render to reflect new weight
-        if (workingData.outrightBlend[market].enabled) {
-          renderMain();
-        }
-      });
-    });
-
-    document.querySelectorAll('[data-blend-action]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        const action = btn.dataset.blendAction;
-        const market = btn.dataset.blendMarket;
-        if (!workingData.outrightBlend[market]) workingData.outrightBlend[market] = { enabled: false, marketWeight: 0.7 };
-        const cfg = workingData.outrightBlend[market];
-        if (action === 'apply') {
-          const fdR = E.parseOddsList(cfg.fanDuelText || '');
-          const dkR = E.parseOddsList(cfg.draftKingsText || '');
-          cfg.fanDuelProbs = fdR.parsed;
-          cfg.draftKingsProbs = dkR.parsed;
-          cfg.enabled = (Object.keys(fdR.parsed).length > 0 && Object.keys(dkR.parsed).length > 0);
-          const totalUnmatched = (fdR.unmatched || []).length + (dkR.unmatched || []).length;
-          if (totalUnmatched > 0) {
-            const allUnmatched = [...(fdR.unmatched || []), ...(dkR.unmatched || [])];
-            alert('Blend applied. ' + Object.keys(fdR.parsed).length + ' FD teams + ' + Object.keys(dkR.parsed).length + ' DK teams matched.\n\nUnmatched lines:\n' + allUnmatched.join('\n'));
-          }
-        } else if (action === 'clear') {
-          cfg.enabled = false;
-          cfg.fanDuelText = '';
-          cfg.draftKingsText = '';
-          cfg.fanDuelProbs = {};
-          cfg.draftKingsProbs = {};
-        }
-        renderMain();
-      });
-    });
+    // Intentionally empty. Editing is in admin only.
   }
 
   function renderRow(leg) {
@@ -1483,22 +1366,11 @@
 
   // ===== WIRE controls =====
   function wireControls(s) {
-    // Mode toggle
-    document.querySelectorAll('.mode-toggle button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const prevMode = s.mode || 'auto';
-        const newMode = btn.dataset.mode;
-        if (prevMode === newMode) return;
-        s.mode = newMode;
-        // When switching TO manual, seed per-game probs from previous mode
-        if (newMode === 'manual') {
-          const seriesInPrevMode = Object.assign({}, s, { mode: prevMode });
-          for (let g = 1; g <= 7; g++) {
-            s.manual['game' + g] = E.topWinProbForGame(seriesInPrevMode, g);
-          }
-        }
-        renderMain();
-      });
+    // Reset to MoneyPuck button (only in manual mode)
+    const resetBtn = document.querySelector('[data-action="reset-derived"]');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      s.mode = 'derived';
+      renderMain();
     });
 
     // Team names
@@ -1506,9 +1378,6 @@
     if (topNameEl) topNameEl.addEventListener('input', e => {
       s.topSeed.name = e.target.value || 'Top Seed';
       renderSeriesTabs();
-      // Re-render markets without losing focus
-      const main = document.getElementById('mainContent');
-      // Update state panel team name and markets only
       renderMain();
     });
     const botNameEl = document.getElementById('botName');
@@ -1518,40 +1387,28 @@
       renderMain();
     });
 
-    // Auto sliders
-    const topHome = document.getElementById('topHomeWin');
-    if (topHome) topHome.addEventListener('input', e => {
-      s.auto.topHomeWinPct = parseFloat(e.target.value) / 100;
-      document.getElementById('topHomeWinValue').textContent = (s.auto.topHomeWinPct * 100).toFixed(1) + '%';
-      // Re-render only markets to keep slider focus
-      const mainEl = document.getElementById('mainContent');
-      const marketsHtml = renderMarkets(s);
-      const existingGrid = mainEl.querySelector('.markets-grid');
-      if (existingGrid) existingGrid.outerHTML = marketsHtml;
-    });
-    const botHome = document.getElementById('botHomeWin');
-    if (botHome) botHome.addEventListener('input', e => {
-      s.auto.botHomeWinPct = parseFloat(e.target.value) / 100;
-      document.getElementById('botHomeWinValue').textContent = (s.auto.botHomeWinPct * 100).toFixed(1) + '%';
-      const mainEl = document.getElementById('mainContent');
-      const marketsHtml = renderMarkets(s);
-      const existingGrid = mainEl.querySelector('.markets-grid');
-      if (existingGrid) existingGrid.outerHTML = marketsHtml;
-    });
-
-    // Manual game inputs
+    // Per-game inputs: editing any game switches the series to manual mode and
+    // seeds all 7 game values from the previously active mode (so the user only
+    // has to override what they want to change).
     document.querySelectorAll('.manual-input').forEach(inp => {
       inp.addEventListener('change', e => {
         const game = parseInt(e.target.dataset.game, 10);
         const american = e.target.value.trim();
         const prob = E.americanToProb(american);
-        if (prob !== null) {
-          s.manual['game' + game] = prob;
-          renderMain();
-        } else {
-          // Reset to current if invalid
-          e.target.value = E.probToAmerican(s.manual['game' + game]);
+        if (prob === null || isNaN(prob)) {
+          // Invalid input — restore current value
+          e.target.value = E.probToAmerican(E.topWinProbForGame(s, game));
+          return;
         }
+        // Seed all games from current mode if switching from derived
+        if (s.mode !== 'manual') {
+          for (let g = 1; g <= 7; g++) {
+            s.manual['game' + g] = E.topWinProbForGame(s, g);
+          }
+          s.mode = 'manual';
+        }
+        s.manual['game' + game] = prob;
+        renderMain();
       });
     });
 
@@ -1581,8 +1438,8 @@
       s.state.history.push([s.state.topWins, s.state.botWins]);
       renderAll();
     });
-    const resetBtn = document.getElementById('resetBtn');
-    if (resetBtn) resetBtn.addEventListener('click', () => {
+    const resetStateBtn = document.getElementById('resetBtn');
+    if (resetStateBtn) resetStateBtn.addEventListener('click', () => {
       pushUndo(s);
       s.state.topWins = 0;
       s.state.botWins = 0;
