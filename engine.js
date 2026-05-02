@@ -774,13 +774,30 @@
   }
 
   // computeOutrights options:
-  //   ignoreOverrides (default false): when true, skips the trader-anchor pipeline
-  //     and uses pure model probabilities. Used by pricing.html to show live model
-  //     values that update as bracket state and per-game prices change. Admin uses
-  //     the default (overrides + biases anchor displayed prices).
+  //   ignoreOverrides (default false): skip trader Cup-price overrides — use raw
+  //     model probabilities for the SCF column. Set this when you want Cup prices
+  //     to follow the live model. Empty/missing overrides also default to model.
+  //   ignoreBiases (default false): skip conference biases (the per-team pp
+  //     adjustments applied after Cup → conference derivation). Set this for the
+  //     pure model view.
+  //   useBaselineDrift (default false): for pricing.html. Anchors are treated as
+  //     "the right price at export time," not as permanent overrides. Pricing
+  //     computes pure-model Cup probs at the CURRENT state and at the BASELINE
+  //     state (saved in workingData.outrightBaseline at export time), then applies
+  //     a per-team multiplier so anchored values drift naturally with the model.
+  //     Conference biases stay applied. If outrightBaseline is missing (old data
+  //     file), falls back to default behavior (anchors held fixed).
+  //
+  // Admin Outrights tab uses { ignoreOverrides: true, ignoreBiases: false } so
+  // that explicit Cup-price anchors still work but blank inputs let the model
+  // drive, while conference biases stay sticky.
+  // Pricing.html uses { useBaselineDrift: true } for "anchored at export, drifts
+  // with the model thereafter."
   function computeOutrights(workingData, options) {
     const opts = options || {};
     const ignoreOverrides = !!opts.ignoreOverrides;
+    const ignoreBiases = !!opts.ignoreBiases;
+    const useBaselineDrift = !!opts.useBaselineDrift;
     const conn = workingData.bracketConnections;
     const series = workingData.series;
     const defaults = workingData.defaults;
@@ -942,14 +959,53 @@
     }
 
     // 2. Trader overrides: stored as { TEAMSHORT: probability } in workingData.outrightOverrides.scf
-    // When ignoreOverrides is set, treat overrides + biases as empty so the model drives.
+    // ignoreOverrides bypasses Cup-price anchors. ignoreBiases bypasses the SCF
+    // bias map (rarely used in practice but supported for parity with conference biases).
     const overrides = ignoreOverrides ? {} : ((workingData.outrightOverrides && workingData.outrightOverrides.scf) || {});
-    const cupBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.scf) || {});
+    const cupBiases = ignoreBiases ? {} : ((workingData.outrightBiases && workingData.outrightBiases.scf) || {});
 
     // Build the SCF fair column: model + overrides, with eliminated teams forced to 0.
     let scfFair = { ...modelScfFair };
-    for (const [k, v] of Object.entries(overrides)) {
-      if (typeof v === 'number' && v >= 0 && v <= 1) scfFair[k] = v;
+
+    // If useBaselineDrift is set, compute the multiplier baseline from
+    // workingData.outrightBaseline. The multiplier per team = anchor / model_at_baseline.
+    // Then live cup = multiplier * model_at_current. Teams without baseline data
+    // (e.g., new bracket entrants since the export) fall through to pure model.
+    const baseline = workingData.outrightBaseline;
+    if (useBaselineDrift && baseline && baseline.anchoredCupAtBaseline && baseline.modelCupAtBaseline) {
+      const anchorBase = baseline.anchoredCupAtBaseline;
+      const modelBase = baseline.modelCupAtBaseline;
+      // Build a multiplier-driven SCF column. Each team:
+      //   - If we have both anchor and model_at_baseline: cup = anchor * model_now / model_base
+      //   - If model_base is missing or 0 but we have an anchor: use anchor directly (avoid /0)
+      //   - If neither: use model_at_current
+      const multiplierDriven = {};
+      const allTeams = new Set([
+        ...Object.keys(modelScfFair),
+        ...Object.keys(anchorBase),
+        ...Object.keys(modelBase)
+      ]);
+      allTeams.forEach(team => {
+        const anchor = anchorBase[team];
+        const mBase = modelBase[team];
+        const mNow = modelScfFair[team] || 0;
+        if (typeof anchor === 'number' && anchor > 0 && typeof mBase === 'number' && mBase > 0) {
+          // Apply multiplier
+          multiplierDriven[team] = anchor * (mNow / mBase);
+        } else if (typeof anchor === 'number' && anchor > 0) {
+          // Anchor present but no usable model_base → use anchor (rare edge case)
+          multiplierDriven[team] = anchor;
+        } else {
+          // No anchor at baseline → use pure model at current state
+          multiplierDriven[team] = mNow;
+        }
+      });
+      scfFair = multiplierDriven;
+    } else {
+      // Default behavior: apply overrides directly (admin's "strict anchor" mode)
+      for (const [k, v] of Object.entries(overrides)) {
+        if (typeof v === 'number' && v >= 0 && v <= 1) scfFair[k] = v;
+      }
     }
     // 3. Eliminate
     for (const k of Object.keys(scfFair)) {
@@ -1013,10 +1069,10 @@
     let eastConfFair = deriveConfFair(modelEastFair, modelScfFair, scfFair, eastConfTeams);
     let westConfFair = deriveConfFair(modelWestFair, modelScfFair, scfFair, westConfTeams);
 
-    // 5. Apply conference biases and renormalize
-    // When ignoreOverrides is set, biases are skipped so the model drives.
-    const eastBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.eastConf) || {});
-    const westBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.westConf) || {});
+    // 5. Apply conference biases and renormalize.
+    // Biases are sticky in admin (only ignored when ignoreBiases is set, e.g. pricing.html).
+    const eastBiases = ignoreBiases ? {} : ((workingData.outrightBiases && workingData.outrightBiases.eastConf) || {});
+    const westBiases = ignoreBiases ? {} : ((workingData.outrightBiases && workingData.outrightBiases.westConf) || {});
     eastConfFair = applyConferenceBiases(eastConfFair, eastBiases);
     westConfFair = applyConferenceBiases(westConfFair, westBiases);
 

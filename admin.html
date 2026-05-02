@@ -1538,7 +1538,10 @@
       <div class="panel cup-edit-panel">
         <div class="panel-header">
           <div class="panel-title">Stanley Cup Prices (trader anchors)</div>
-          <button class="btn-clear" id="resetAllCupOverrides">Reset all to MoneyPuck</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-clear" id="clearCupOverridesKeepBiases" title="Clear all Cup price anchors so model drives — conference biases stay applied">Clear Cup overrides only</button>
+            <button class="btn-clear" id="resetAllCupOverrides" title="Clear Cup overrides AND conference biases">Reset everything</button>
+          </div>
         </div>
         <div class="cup-edit-note">${totalNote}</div>
         <div class="cup-edit-grid">
@@ -1625,6 +1628,17 @@
       if (!confirm('Reset all Stanley Cup price overrides and conference biases?')) return;
       workingData.outrightOverrides = { scf: {} };
       workingData.outrightBiases = { eastConf: {}, westConf: {}, scf: {} };
+      renderMain();
+      renderModifiedBanner();
+    });
+
+    // Clear only Cup overrides — preserves conference biases. After clicking,
+    // Cup probabilities are driven by the live model (which incorporates manual
+    // per-game prices and bracket state), but biases stay applied on top.
+    const clearOvBtn = document.getElementById('clearCupOverridesKeepBiases');
+    if (clearOvBtn) clearOvBtn.addEventListener('click', () => {
+      if (!confirm('Clear all Stanley Cup price anchors?\\n\\nConference biases will be preserved. Cup probabilities will be driven by the live model going forward.')) return;
+      workingData.outrightOverrides = { scf: {} };
       renderMain();
       renderModifiedBanner();
     });
@@ -2180,9 +2194,36 @@
   }
 
   // ===== EXPORT =====
+  // Before serializing, snapshot the current outright state into outrightBaseline.
+  // This is what pricing.html reads to compute multiplier-driven Cup probabilities
+  // that drift with the model as bracket state evolves between exports.
+  //   anchoredCupAtBaseline: admin-anchored Cup probs at this moment (overrides + eliminations + renormalization)
+  //   modelCupAtBaseline:    pure-model Cup probs at this moment (no overrides, no biases)
+  // Pricing computes multiplier per team = anchored / model_at_baseline, then applies
+  // it to model_at_current_state. When state matches baseline → pricing == admin.
+  // When state moves → anchors drift naturally.
+  function snapshotOutrightBaseline() {
+    const anchored = E.computeOutrights(workingData);
+    const pureModel = E.computeOutrights(workingData, { ignoreOverrides: true, ignoreBiases: true });
+    const anchoredCupAtBaseline = {};
+    const modelCupAtBaseline = {};
+    anchored.teams.forEach(t => {
+      if (t.fairWinStanleyCup > 0) anchoredCupAtBaseline[t.short] = t.fairWinStanleyCup;
+    });
+    pureModel.teams.forEach(t => {
+      if (t.fairWinStanleyCup > 0) modelCupAtBaseline[t.short] = t.fairWinStanleyCup;
+    });
+    return {
+      exportedAt: new Date().toISOString(),
+      anchoredCupAtBaseline,
+      modelCupAtBaseline
+    };
+  }
+
   function buildExport() {
     workingData.generatedAt = new Date().toISOString();
     workingData.generatedBy = 'admin.html';
+    workingData.outrightBaseline = snapshotOutrightBaseline();
     const json = JSON.stringify(workingData, null, 2);
     return `// =============================================================================
 // playoffs.js — Source of truth for NHL Playoff series data

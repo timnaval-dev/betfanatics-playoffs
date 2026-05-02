@@ -1267,13 +1267,13 @@
   }
 
   // ===== RENDER: outrights / futures view =====
-  // Pricing uses the SAME anchored values as admin (Cup overrides + biases applied).
-  // Cup anchors stay fixed regardless of bracket state. As state changes, the
-  // conditional probability ratio used in the conference derivation shifts, so
-  // conference / derived market probabilities update naturally — that's the
-  // "starting point + state-driven deltas" behavior.
+  // Pricing uses BASELINE DRIFT mode. At export time, admin bakes a snapshot of
+  // anchored Cup probs and pure-model Cup probs into playoffs.js. Pricing applies
+  // a per-team multiplier (anchor / model_at_baseline) on top of model_at_current_state.
+  // Net effect: at export time, pricing == admin. As bracket state changes, anchored
+  // values drift naturally with the model. Conference biases stay applied (sticky).
   function renderOutrightsView() {
-    const o = E.computeOutrights(workingData);
+    const o = E.computeOutrights(workingData, { useBaselineDrift: true });
 
     const renderTeamRow = (team, probField, offeredField, biasField) => {
       const fair = team[probField];
@@ -1346,9 +1346,9 @@
   const PRICING_DERIVED_CUP_COLLAPSED = new Set(['scfExactResult']);
 
   function renderDerivedCupMarkets() {
-    // Same as renderOutrightsView: anchored values are the starting point;
-    // state changes flow through naturally via the model's conditional probabilities.
-    const o = E.computeOutrights(workingData);
+    // Same as renderOutrightsView: baseline drift so derived markets reflect
+    // model-driven movement on top of admin-anchored starting points.
+    const o = E.computeOutrights(workingData, { useBaselineDrift: true });
     const teamsTable = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : null;
     let d;
     try {
