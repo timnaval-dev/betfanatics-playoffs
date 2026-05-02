@@ -1,4 +1,4 @@
-[# NHL Playoffs Pricing Suite
+# NHL Playoffs Pricing Suite
 
 Two-tool system for live series pricing across all 15 NHL Playoff series, backed by a single config file in this repo.
 
