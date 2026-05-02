@@ -1391,8 +1391,7 @@
       push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 4-0', fmtPrice(bot40));
       push('afterG4', matchupShort + ' Series Score After Game 4', topFull + ' 3-1', fmtPrice(top31));
       push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 3-1', fmtPrice(bot31));
-      push('afterG4', matchupShort + ' Series Score After Game 4', topFull + ' 2-2', fmtPrice(tied22));
-      push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 2-2', fmtPrice(tied22));
+      push('afterG4', matchupShort + ' Series Score After Game 4', 'Tied 2-2', fmtPrice(tied22));
     }
 
     // 6. Series Score After Game 3 (4 selections — only if G3 not yet played)
