@@ -858,6 +858,11 @@ const PLAYOFFS_DATA = {
       "g1AndSeries": 0.04,
       "conferenceWinner": 0.1,
       "stanleyCupWinner": 0.15,
+      "conferenceOfCupWinner": 0.05,
+      "divisionOfCupWinner": 0.08,
+      "countryOfCupWinner": 0.05,
+      "firstTimeCupWinner": 0.06,
+      "scfExactResult": 0.20,
       "outrightSchedule": {
         "1": {
           "conference": 0.1,
