@@ -386,6 +386,87 @@
       ]
     };
 
+    // Game 1 Winner / Series Winner Parlay — 4-way exact
+    // Joint distribution of (G1 winner, series winner). Once G1 has been played,
+    // the two parlays where the wrong team won G1 settle to 0; the two surviving
+    // parlays equal the series-winner price for that team (since the G1 leg won).
+    //
+    // Math (pre-G1):
+    //   P(A G1) = pTopGame1, P(B G1) = 1 - pTopGame1
+    //   P(A series | A won G1) = run Markov from state (1, 0)
+    //   P(A series | B won G1) = run Markov from state (0, 1)
+    //   Joint(X G1, Y series) = P(X G1) * P(Y series | X G1)
+    function seriesWinProbFromState(s, topW, botW) {
+      // Markov forward from (topW, botW) using current per-game probs.
+      // Mirrors computeReachProbs but starts at an arbitrary state.
+      if (topW >= 4) return 1.0;
+      if (botW >= 4) return 0.0;
+      let dist = { [topW + ',' + botW]: 1.0 };
+      const startGameTotal = topW + botW;
+      for (let g = startGameTotal; g < 7; g++) {
+        const gameNum = g + 1;
+        const pTopG = topWinProbForGame(s, gameNum);
+        const pBotG = 1 - pTopG;
+        const next = {};
+        for (const key of Object.keys(dist)) {
+          const [iStr, jStr] = key.split(',');
+          const i = +iStr, j = +jStr;
+          if (i >= 4 || j >= 4) {
+            next[key] = (next[key] || 0) + dist[key];
+            continue;
+          }
+          const kT = (i + 1) + ',' + j;
+          const kB = i + ',' + (j + 1);
+          next[kT] = (next[kT] || 0) + dist[key] * pTopG;
+          next[kB] = (next[kB] || 0) + dist[key] * pBotG;
+        }
+        dist = next;
+      }
+      let pTop = 0;
+      for (let j = 0; j <= 3; j++) pTop += dist['4,' + j] || 0;
+      return pTop;
+    }
+
+    const playedCount = (series.state.topWins || 0) + (series.state.botWins || 0);
+    const g1Done = playedCount >= 1;
+    let g1FairTopAndTop, g1FairTopAndBot, g1FairBotAndTop, g1FairBotAndBot;
+    if (!g1Done) {
+      // Pre-G1: full joint distribution
+      const pTopG1 = topWinProbForGame(series, 1);
+      const pBotG1 = 1 - pTopG1;
+      // Series probs conditional on G1 outcome (run Markov from 1,0 and 0,1)
+      const pTopWinsGivenTopG1 = seriesWinProbFromState(series, 1, 0);
+      const pTopWinsGivenBotG1 = seriesWinProbFromState(series, 0, 1);
+      g1FairTopAndTop = pTopG1 * pTopWinsGivenTopG1;
+      g1FairTopAndBot = pTopG1 * (1 - pTopWinsGivenTopG1);
+      g1FairBotAndTop = pBotG1 * pTopWinsGivenBotG1;
+      g1FairBotAndBot = pBotG1 * (1 - pTopWinsGivenBotG1);
+    } else {
+      // Post-G1: collapse to series-winner odds for the surviving combinations.
+      // We can read who won G1 from series.state.history[1] (state after G1).
+      const hist = series.state.history || [[0,0]];
+      const afterG1 = hist[1] || [0, 0];
+      const topWonG1 = afterG1[0] >= 1;
+      // Series probs are already pTopSeries / pBotSeries (computed above from current state).
+      g1FairTopAndTop = topWonG1 ? pTopSeries : 0;
+      g1FairTopAndBot = topWonG1 ? pBotSeries : 0;
+      g1FairBotAndTop = topWonG1 ? 0 : pTopSeries;
+      g1FairBotAndBot = topWonG1 ? 0 : pBotSeries;
+    }
+    const g1Margin = resolveMargin(series, 'g1AndSeries', defaults);
+    const g1ParlayFair = [g1FairTopAndTop, g1FairTopAndBot, g1FairBotAndTop, g1FairBotAndBot];
+    const g1ParlayOffered = applyMargin(g1ParlayFair, g1Margin);
+    const g1AndSeries = {
+      type: 'exact',
+      overallMargin: g1ParlayOffered.reduce((a, b) => a + b, 0) - 1,
+      legs: [
+        { label: topName + ' G1 + ' + topName + ' Series', fair: g1ParlayFair[0], offered: g1ParlayOffered[0] },
+        { label: topName + ' G1 + ' + botName + ' Series', fair: g1ParlayFair[1], offered: g1ParlayOffered[1] },
+        { label: botName + ' G1 + ' + topName + ' Series', fair: g1ParlayFair[2], offered: g1ParlayOffered[2] },
+        { label: botName + ' G1 + ' + botName + ' Series', fair: g1ParlayFair[3], offered: g1ParlayOffered[3] }
+      ]
+    };
+
     return {
       P,
       pTopSeries,
@@ -397,7 +478,8 @@
       spreads,
       afterG3,
       afterG4,
-      fromBehind
+      fromBehind,
+      g1AndSeries
     };
   }
 
@@ -503,6 +585,104 @@
     if (division) return codes.filter(c => teams[c].division === division);
     if (conference) return codes.filter(c => teams[c].conference === conference);
     return codes;
+  }
+
+  // Apply NHL playoff seeding rules to populate R1 matchups from standings.
+  // Standings format: { atlantic: [1st, 2nd, 3rd], metropolitan: [...], central: [...],
+  //                     pacific: [...], wildCardEast: [WC1, WC2], wildCardWest: [WC1, WC2] }
+  // Wild cards must be ordered higher-points first (WC1 = better record, WC2 = worse).
+  //
+  // Seeding logic per conference:
+  //   - The two division winners face the wild cards. The division winner with MORE
+  //     points faces WC2 (the worse wild card), and the other division winner faces WC1.
+  //   - 2 vs 3 inside each division (no cross-division 2/3 games).
+  //
+  // We need a way to determine which division winner has more points. Without explicit
+  // points stored, we use array order (caller convention): the conference's two division
+  // winners listed in `topConferenceSeeds` array, first = better record.
+  //
+  // Caller passes standings AND a topConferenceSeeds map. If the latter is omitted, we
+  // use the order ['atlantic', 'metropolitan'] for East and ['central', 'pacific'] for
+  // West, meaning the first listed is treated as the better record.
+  //
+  // Returns a partial bracket-style structure ready to merge into workingData.series:
+  //   { 'e1-atl-1v4': { topSeed: {...}, botSeed: {...} }, ... }
+  function seedR1FromStandings(standings, teamsTable, topConfSeeds) {
+    const teams = teamsTable || (global.NHL_TEAMS || {});
+    const seeds = topConfSeeds || { east: ['atlantic', 'metropolitan'], west: ['central', 'pacific'] };
+
+    function teamObj(short) {
+      const t = teams[short];
+      return { name: (t && t.name) || short, short };
+    }
+
+    // East: figure out which division winner gets WC1 vs WC2
+    // Convention: first entry in seeds.east has better record → faces WC2
+    const eastDiv1Name = seeds.east[0]; // e.g. 'atlantic' (better record)
+    const eastDiv2Name = seeds.east[1]; // e.g. 'metropolitan' (worse record but still div winner)
+    const eastDiv1Top = standings[eastDiv1Name][0]; // e.g. BUF
+    const eastDiv2Top = standings[eastDiv2Name][0]; // e.g. CAR
+    const eastWC1 = standings.wildCardEast[0];      // higher-points WC
+    const eastWC2 = standings.wildCardEast[1];      // lower-points WC
+
+    // Better division winner faces WC2, other faces WC1
+    const eastDiv1WildCard = eastWC2;
+    const eastDiv2WildCard = eastWC1;
+
+    // Same for West
+    const westDiv1Name = seeds.west[0];
+    const westDiv2Name = seeds.west[1];
+    const westDiv1Top = standings[westDiv1Name][0];
+    const westDiv2Top = standings[westDiv2Name][0];
+    const westWC1 = standings.wildCardWest[0];
+    const westWC2 = standings.wildCardWest[1];
+    const westDiv1WildCard = westWC2;
+    const westDiv2WildCard = westWC1;
+
+    // Map division name → R1 series ID prefix
+    const divToPrefix = {
+      atlantic: 'atl',
+      metropolitan: 'met',
+      central: 'cen',
+      pacific: 'pac'
+    };
+
+    const out = {};
+    // East
+    out['e1-' + divToPrefix[eastDiv1Name] + '-1v4'] = {
+      topSeed: teamObj(eastDiv1Top),
+      botSeed: teamObj(eastDiv1WildCard)
+    };
+    out['e1-' + divToPrefix[eastDiv1Name] + '-2v3'] = {
+      topSeed: teamObj(standings[eastDiv1Name][1]),
+      botSeed: teamObj(standings[eastDiv1Name][2])
+    };
+    out['e1-' + divToPrefix[eastDiv2Name] + '-1v4'] = {
+      topSeed: teamObj(eastDiv2Top),
+      botSeed: teamObj(eastDiv2WildCard)
+    };
+    out['e1-' + divToPrefix[eastDiv2Name] + '-2v3'] = {
+      topSeed: teamObj(standings[eastDiv2Name][1]),
+      botSeed: teamObj(standings[eastDiv2Name][2])
+    };
+    // West
+    out['w1-' + divToPrefix[westDiv1Name] + '-1v4'] = {
+      topSeed: teamObj(westDiv1Top),
+      botSeed: teamObj(westDiv1WildCard)
+    };
+    out['w1-' + divToPrefix[westDiv1Name] + '-2v3'] = {
+      topSeed: teamObj(standings[westDiv1Name][1]),
+      botSeed: teamObj(standings[westDiv1Name][2])
+    };
+    out['w1-' + divToPrefix[westDiv2Name] + '-1v4'] = {
+      topSeed: teamObj(westDiv2Top),
+      botSeed: teamObj(westDiv2WildCard)
+    };
+    out['w1-' + divToPrefix[westDiv2Name] + '-2v3'] = {
+      topSeed: teamObj(standings[westDiv2Name][1]),
+      botSeed: teamObj(standings[westDiv2Name][2])
+    };
+    return out;
   }
 
   // Determine the "round" each market is currently in, based on which series have
@@ -909,6 +1089,7 @@
     computeMarketRound,
     getOutrightMargin,
     eligibleTeamsForSeries,
+    seedR1FromStandings,
     marginBadgeColor,
     fmtMargin,
     fmtPct,

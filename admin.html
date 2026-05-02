@@ -123,11 +123,13 @@
     border-color: var(--border-light); background: var(--bg-tertiary);
   }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.primary {
-    background: var(--accent-dim); border-color: var(--accent);
-    color: var(--text-primary);
-  }
+  button.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--text-primary); }
   button.primary:hover { background: var(--accent); }
+  button.secondary {
+    background: var(--bg-tertiary); border-color: var(--border-light);
+    color: var(--text-secondary);
+  }
+  button.secondary:hover { background: var(--bg-elevated, var(--bg-tertiary)); color: var(--text-primary); }
   button.toggle.active {
     background: var(--accent-dim); border-color: var(--accent);
     color: var(--text-primary);
@@ -653,7 +655,7 @@
   .bracket-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(140px, 1fr));
-    grid-template-rows: 28px repeat(8, minmax(60px, 1fr));
+    grid-template-rows: 28px repeat(4, minmax(60px, 1fr));
     gap: 8px 12px;
     min-width: 1100px;
   }
@@ -930,6 +932,7 @@
       <div class="subtitle">Edit Live Config · Promote Winners · Export</div>
     </div>
     <div class="header-right">
+      <button id="seedFromStandingsBtn" class="secondary">Initialize bracket from standings</button>
       <button id="exportBtn" class="primary">Export new playoffs.js</button>
     </div>
   </header>
@@ -1130,10 +1133,10 @@
     wd.bracket.east.r1.forEach((id, i) => positions.push({ id, col: 1, row: 2 + i, span: 1 }));
     wd.bracket.east.r2.forEach((id, i) => positions.push({ id, col: 2, row: 2 + i * 2, span: 2 }));
     positions.push({ id: wd.bracket.east.r3, col: 3, row: 2, span: 4 });
-    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 8 });
-    positions.push({ id: wd.bracket.west.r3, col: 5, row: 6, span: 4 });
-    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 6 + i * 2, span: 2 }));
-    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 6 + i, span: 1 }));
+    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 4 });
+    positions.push({ id: wd.bracket.west.r3, col: 5, row: 2, span: 4 });
+    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 2 + i * 2, span: 2 }));
+    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 2 + i, span: 1 }));
 
     const labels = [
       { col: 1, text: 'Round 1 (E)' },
@@ -1332,7 +1335,7 @@
             <label>Conf Bias <span class="bias-readout">${biasLabel}pp</span></label>
             ${t.eliminated
               ? `<div class="cup-edit-value-elim">—</div>`
-              : `<input type="range" class="cup-bias-slider" data-team="${t.short}" data-conf="${t.conference}" min="-30" max="30" step="1" value="${sliderValue}">`
+              : `<input type="range" class="cup-bias-slider" data-team="${t.short}" data-conf="${t.conference}" min="-50" max="50" step="1" value="${sliderValue}">`
             }
           </div>
 
@@ -1713,7 +1716,8 @@
       ['spreads', 'Spreads'],
       ['afterG3', 'After Game 3'],
       ['afterG4', 'After Game 4'],
-      ['fromBehindNeverTrail', 'From Behind / NT']
+      ['fromBehindNeverTrail', 'From Behind / NT'],
+      ['g1AndSeries', 'G1 + Series Parlay']
     ];
     let cellsHtml = '';
     marketKeys.forEach(([key, label]) => {
@@ -1885,6 +1889,40 @@ if (typeof module !== 'undefined' && module.exports) {
 
   document.getElementById('exportBtn').addEventListener('click', showExportModal);
   document.getElementById('exportBtn2').addEventListener('click', showExportModal);
+
+  // Seed R1 matchups from standings. Uses the conference-seed convention
+  // (better-record division winner faces the worse wild card).
+  document.getElementById('seedFromStandingsBtn').addEventListener('click', () => {
+    const standings = workingData.standings;
+    if (!standings) {
+      alert('No standings configured in playoffs.js. Add a "standings" block with division orderings + wild cards before seeding.');
+      return;
+    }
+    if (!confirm('Re-populate R1 matchups from standings? This will overwrite the current top/bottom seed for each R1 series. State (wins/losses) will be preserved.')) return;
+
+    // Default convention: which division winner has the better record per conference?
+    // Tim's current standings: CAR 113 > BUF 109, COL 121 > VGK 95.
+    // So Metropolitan first in East, Central first in West.
+    // To make this generic, we look at the first team in each division's standings array
+    // and check NHL_TEAMS for a points value if available. For now we assume
+    // the order [met,atl] for East and [cen,pac] for West which matches current data.
+    // If you need to flip it (e.g. Atlantic top seed has better record next year),
+    // edit the topConfSeeds object below or update standings ordering before seeding.
+    const seeds = E.seedR1FromStandings(standings, undefined, {
+      east: ['metropolitan', 'atlantic'],
+      west: ['central', 'pacific']
+    });
+
+    Object.entries(seeds).forEach(([id, slot]) => {
+      const s = workingData.series[id];
+      if (!s) return;
+      s.topSeed = slot.topSeed;
+      s.botSeed = slot.botSeed;
+    });
+    renderAll();
+    renderModifiedBanner();
+  });
+
   document.getElementById('closeModalBtn').addEventListener('click', () => {
     document.getElementById('exportModal').style.display = 'none';
     document.getElementById('copyConfirm').style.display = 'none';

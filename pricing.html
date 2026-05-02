@@ -671,7 +671,7 @@
   .bracket-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(140px, 1fr));
-    grid-template-rows: 28px repeat(8, minmax(60px, 1fr));
+    grid-template-rows: 28px repeat(4, minmax(60px, 1fr));
     gap: 8px 12px;
     min-width: 1100px;
   }
@@ -878,22 +878,23 @@
   // R1 cells span 1 row, R2 cells span 2, R3 cells span 4, SCF spans 8.
   function buildBracketHTML() {
     const wd = workingData;
-    // Position table: { id, col (1-7), rowStart (2-9, accounting for header row), rowSpan }
+    // Both conferences laid out side-by-side on the same 4 rows.
+    // East rows 2-5 (left side), West mirror image rows 2-5 (right side), SCF in middle.
     const positions = [];
     // East R1 (col 1, rows 2-5)
     wd.bracket.east.r1.forEach((id, i) => positions.push({ id, col: 1, row: 2 + i, span: 1 }));
-    // East R2 (col 2, each spans 2 rows starting at row 2 and row 4)
+    // East R2 (col 2, each spans 2 rows)
     wd.bracket.east.r2.forEach((id, i) => positions.push({ id, col: 2, row: 2 + i * 2, span: 2 }));
     // East R3 (col 3, spans rows 2-5 = 4 rows)
     positions.push({ id: wd.bracket.east.r3, col: 3, row: 2, span: 4 });
-    // SCF (col 4, spans rows 2-9 = 8 rows)
-    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 8 });
-    // West R3 (col 5, spans rows 6-9 = 4 rows)
-    positions.push({ id: wd.bracket.west.r3, col: 5, row: 6, span: 4 });
-    // West R2 (col 6, each spans 2 rows starting at row 6 and row 8)
-    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 6 + i * 2, span: 2 }));
-    // West R1 (col 7, rows 6-9)
-    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 6 + i, span: 1 }));
+    // SCF (col 4, spans rows 2-5 = 4 rows, centered)
+    positions.push({ id: wd.bracket.final, col: 4, row: 2, span: 4 });
+    // West R3 (col 5, spans rows 2-5 = 4 rows)
+    positions.push({ id: wd.bracket.west.r3, col: 5, row: 2, span: 4 });
+    // West R2 (col 6, each spans 2 rows)
+    wd.bracket.west.r2.forEach((id, i) => positions.push({ id, col: 6, row: 2 + i * 2, span: 2 }));
+    // West R1 (col 7, rows 2-5)
+    wd.bracket.west.r1.forEach((id, i) => positions.push({ id, col: 7, row: 2 + i, span: 1 }));
 
     const labels = [
       { col: 1, text: 'Round 1 (E)' },
@@ -1214,6 +1215,7 @@
         ${renderExactMarket('Series Score After Game 3', m.afterG3.settled ? 'SETTLED' : '4-Way', m.afterG3, m.afterG3.settled)}
         ${renderExactMarket('Series Score After Game 4', m.afterG4.settled ? 'SETTLED' : '5-Way', m.afterG4, m.afterG4.settled)}
         ${renderExactMarket('From Behind / Never Trail', '4-Way', m.fromBehind, false, true)}
+        ${renderExactMarket('Game 1 Winner / Series Winner', '4-Way', m.g1AndSeries)}
       </div>
     `;
   }
@@ -1231,12 +1233,7 @@
       const muted = team.eliminated ? 'muted eliminated' : (fair < 0.001 ? 'muted' : '');
       const teamData = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS[team.short] : null;
       const accent = teamData ? teamData.home.primary : 'var(--accent-bright)';
-      const bias = team[biasField] || 0;
-
-      // Pricing page: bias badges shown for transparency, but no editing surface.
-      const biasBadge = bias !== 0
-        ? `<span class="bias-badge ${bias > 0 ? 'pos' : 'neg'}">${bias > 0 ? '+' : ''}${(bias * 100).toFixed(1)}%</span>`
-        : '';
+      // Pricing page hides biases — admin-only signal.
       const elimBadge = team.eliminated ? '<span class="elim-badge">OUT</span>' : '';
 
       return `
@@ -1247,7 +1244,7 @@
               <div class="outright-team-line">
                 <span class="outright-team-short">${escapeHtml(team.short)}</span>
                 <span class="outright-team-name">${escapeHtml(team.name)}</span>
-                ${biasBadge}${elimBadge}
+                ${elimBadge}
               </div>
             </div>
           </div>
@@ -1277,16 +1274,6 @@
     };
 
     return `
-      <div class="outrights-banner">
-        <div class="outrights-banner-title">Outright / Futures Markets</div>
-        <div class="outrights-banner-desc">
-          Conference and Stanley Cup winner odds. Stanley Cup probabilities anchor on
-          trader-set targets (configured in admin); conference winners derive from those.
-          Margins step down gradually as each series ends. Update per-game prices or
-          mark wins/losses on the series tabs to recompute the column.
-        </div>
-      </div>
-
       <div class="markets-grid">
         ${renderOutrightCard('Eastern Conference Winner', '8 teams', o.eastTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.eastConfMargin, o.eastRound)}
         ${renderOutrightCard('Western Conference Winner', '8 teams', o.westTeams, 'fairWinConference', 'offeredWinConference', 'biasConference', o.westConfMargin, o.westRound)}
