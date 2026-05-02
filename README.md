@@ -1,4 +1,4 @@
-# NHL Playoffs Pricing Suite
+[# NHL Playoffs Pricing Suite
 
 Two-tool system for live series pricing across all 15 NHL Playoff series, backed by a single config file in this repo.
 
@@ -170,9 +170,10 @@ If you've already exported but want to undo, use git history to roll `playoffs.j
 
 ## Future enhancements (not currently built)
 
-- OT and in-game props per game
+- OT and players props per series
 - Bet builder / SGP combinations
 - Real-time pull from feeds
 - User-specific margin presets
 
 If you want any of these, ping me.
+](https://timnaval-dev.github.io/betfanatics-playoffs/pricing.html)
