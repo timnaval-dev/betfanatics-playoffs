@@ -1352,11 +1352,99 @@
         ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', o.scfMargin, o.scfRound, true)}
       </div>
 
+      ${renderDerivedCupMarkets()}
+
       <div class="outrights-bracket-section">
         <div class="outrights-bracket-title">Bracket Overview</div>
         ${buildBracketHTML()}
       </div>
     `;
+  }
+
+  // ===== DERIVED CUP MARKETS (admin) =====
+  // Five markets that derive from the per-team Cup probabilities. Rendered below
+  // the main outright cards as collapsible market panels (same UX as the live
+  // markets panel in the series view). All update automatically when Cup prices change.
+  function renderDerivedCupMarkets() {
+    const o = E.computeOutrights(workingData);
+    const teamsTable = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : null;
+    let d;
+    try {
+      d = E.computeDerivedCupMarkets(workingData, o, teamsTable);
+    } catch (err) {
+      return `<div class="panel"><div class="panel-header"><div class="panel-title">Derived Cup Markets</div></div><div style="padding:10px;color:var(--text-tertiary);font-size:12px;">Could not compute: ${escapeHtml(err.message)}</div></div>`;
+    }
+
+    const cards = [
+      { key: 'conferenceOfCupWinner', title: 'Conference of Cup Winner',     tag: '2-Way',     kind: 'paired', market: d.conferenceOfCupWinner },
+      { key: 'divisionOfCupWinner',   title: 'Division of Cup Winner',       tag: '4-Way',     kind: 'exact',  market: d.divisionOfCupWinner },
+      { key: 'countryOfCupWinner',    title: 'Country of Cup Winner',        tag: '2-Way',     kind: 'paired', market: d.countryOfCupWinner },
+      { key: 'firstTimeCupWinner',    title: 'First-Time Cup Winner',        tag: 'Yes / No',  kind: 'paired', market: d.firstTimeCupWinner },
+      { key: 'scfExactResult',        title: 'Stanley Cup Finals Exact Result', tag: d.scfExactResult.legs.length + '-Way', kind: 'exact', market: d.scfExactResult, wide: true }
+    ];
+
+    const cardsHtml = cards.map(c => {
+      const collapsed = DERIVED_CUP_COLLAPSED.has(c.key);
+      const innerHtml = (c.kind === 'paired')
+        ? renderPairedMarketBody(c.market)
+        : renderExactMarketBody(c.market);
+      return `
+        <div class="market collapsible ${collapsed ? 'collapsed' : ''} ${c.wide ? 'wide' : ''}" data-derived-cup-key="${c.key}">
+          <div class="market-header" data-toggle-derived-cup="${c.key}">
+            <div class="market-title-wrap">
+              <span class="market-toggle-caret">▼</span>
+              <div class="market-title">${escapeHtml(c.title)}</div>
+            </div>
+            <div class="market-tag">${escapeHtml(c.tag)}</div>
+          </div>
+          <div class="market-content">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="live-markets-panel" style="margin-top:24px;">
+        <div class="live-markets-header">
+          <h3>Derived Cup Markets <span class="live-markets-hint">· derived from Cup prices above</span></h3>
+          <div class="live-markets-actions">
+            <button id="derivedCupExpandAll" type="button">Expand all</button>
+            <button id="derivedCupCollapseAll" type="button">Collapse all</button>
+          </div>
+        </div>
+        <div class="markets-grid">${cardsHtml}</div>
+      </div>
+    `;
+  }
+
+  // Default state: Conference / Division / Country / First-Time expanded;
+  // SCF Exact Result collapsed because 128 rows is overwhelming on first view.
+  const DERIVED_CUP_COLLAPSED = new Set(['scfExactResult']);
+
+  function wireDerivedCupMarkets() {
+    document.querySelectorAll('[data-toggle-derived-cup]').forEach(header => {
+      header.addEventListener('click', () => {
+        const key = header.getAttribute('data-toggle-derived-cup');
+        const card = header.closest('.market');
+        const isCollapsed = card.classList.toggle('collapsed');
+        if (isCollapsed) DERIVED_CUP_COLLAPSED.add(key);
+        else DERIVED_CUP_COLLAPSED.delete(key);
+      });
+    });
+    const expandBtn = document.getElementById('derivedCupExpandAll');
+    if (expandBtn) expandBtn.addEventListener('click', () => {
+      DERIVED_CUP_COLLAPSED.clear();
+      document.querySelectorAll('[data-derived-cup-key]').forEach(card => card.classList.remove('collapsed'));
+    });
+    const collapseBtn = document.getElementById('derivedCupCollapseAll');
+    if (collapseBtn) collapseBtn.addEventListener('click', () => {
+      document.querySelectorAll('[data-derived-cup-key]').forEach(card => {
+        const key = card.getAttribute('data-derived-cup-key');
+        DERIVED_CUP_COLLAPSED.add(key);
+        card.classList.add('collapsed');
+      });
+    });
   }
 
   // Stanley Cup Price editor — the heart of the outrights workflow.
@@ -1461,6 +1549,10 @@
   }
 
   function wireOutrightControls() {
+    // Wire the derived cup markets panel (collapse toggles, expand/collapse-all).
+    // Done first so the controls work even if the cup-price wiring below errors.
+    wireDerivedCupMarkets();
+
     // Cup price input handlers: parse American odds → store probability → re-render.
     document.querySelectorAll('.cup-price-input').forEach(inp => {
       inp.addEventListener('change', e => {

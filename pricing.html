@@ -734,6 +734,52 @@
     .state-divider { font-size: 32px; }
     .manual-grid { grid-template-columns: repeat(4, 1fr); }
   }
+
+  /* Derived Cup markets panel (matches admin styling) */
+  .derived-cup-panel {
+    margin-top: 24px;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+  }
+  .derived-cup-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .derived-cup-header h3 {
+    font-family: var(--display); font-size: 14px; font-weight: 600;
+    color: var(--text-primary); letter-spacing: -0.01em; margin: 0;
+  }
+  .derived-cup-hint {
+    font-family: var(--mono); font-size: 10px; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .market.collapsible { padding: 0; }
+  .market.collapsible .market-header {
+    cursor: pointer; user-select: none;
+    transition: background 0.1s;
+  }
+  .market.collapsible .market-header:hover { background: rgba(255,255,255,0.02); }
+  .market.collapsible.collapsed .market-header { border-bottom: none; }
+  .market.collapsible .market-title-wrap {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .market-toggle-caret {
+    display: inline-block; width: 10px; height: 10px;
+    color: var(--text-tertiary); font-size: 10px;
+    transition: transform 0.15s;
+  }
+  .market.collapsible.collapsed .market-toggle-caret { transform: rotate(-90deg); }
+  .market.collapsible .market-content {
+    overflow: hidden;
+    transition: max-height 0.2s ease, opacity 0.15s ease;
+  }
+  .market.collapsible.collapsed .market-content {
+    max-height: 0; opacity: 0;
+  }
+  .market.collapsible:not(.collapsed) .market-content {
+    max-height: 99999px; opacity: 1;
+  }
 </style>
 </head>
 <body>
@@ -1280,6 +1326,8 @@
         ${renderOutrightCard('Stanley Cup Winner', '16 teams', o.allTeamsByCup, 'fairWinStanleyCup', 'offeredWinStanleyCup', 'biasStanleyCup', o.scfMargin, o.scfRound, true)}
       </div>
 
+      ${renderDerivedCupMarkets()}
+
       <div class="outrights-bracket-section">
         <div class="outrights-bracket-title">Bracket Overview</div>
         ${renderBracketViewInline()}
@@ -1287,9 +1335,102 @@
     `;
   }
 
+  // ===== DERIVED CUP MARKETS (pricing — read-only) =====
+  // Five markets derived from Stanley Cup probabilities. Default state matches admin:
+  // Conference, Division, Country, First-Time open; SCF Exact Result collapsed (128 rows).
+  const PRICING_DERIVED_CUP_COLLAPSED = new Set(['scfExactResult']);
+
+  function renderDerivedCupMarkets() {
+    const o = E.computeOutrights(workingData);
+    const teamsTable = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : null;
+    let d;
+    try {
+      d = E.computeDerivedCupMarkets(workingData, o, teamsTable);
+    } catch (err) {
+      return `<div class="derived-cup-panel"><div class="derived-cup-header"><h3>Derived Cup Markets</h3></div><div style="color:var(--text-tertiary);font-size:12px;">Could not compute: ${escapeHtml(err.message)}</div></div>`;
+    }
+
+    const cards = [
+      { key: 'conferenceOfCupWinner', title: 'Conference of Cup Winner',     tag: '2-Way',     kind: 'paired', market: d.conferenceOfCupWinner },
+      { key: 'divisionOfCupWinner',   title: 'Division of Cup Winner',       tag: '4-Way',     kind: 'exact',  market: d.divisionOfCupWinner },
+      { key: 'countryOfCupWinner',    title: 'Country of Cup Winner',        tag: '2-Way',     kind: 'paired', market: d.countryOfCupWinner },
+      { key: 'firstTimeCupWinner',    title: 'First-Time Cup Winner',        tag: 'Yes / No',  kind: 'paired', market: d.firstTimeCupWinner },
+      { key: 'scfExactResult',        title: 'Stanley Cup Finals Exact Result', tag: d.scfExactResult.legs.length + '-Way', kind: 'exact', market: d.scfExactResult, wide: true }
+    ];
+
+    const cardsHtml = cards.map(c => {
+      const collapsed = PRICING_DERIVED_CUP_COLLAPSED.has(c.key);
+      const bodyHtml = (c.kind === 'paired')
+        ? buildPairedBody(c.market)
+        : buildExactBody(c.market);
+
+      return `
+        <div class="market collapsible ${collapsed ? 'collapsed' : ''} ${c.wide ? 'wide' : ''}" data-derived-cup-key="${c.key}">
+          <div class="market-header" data-toggle-derived-cup="${c.key}">
+            <div class="market-title-wrap">
+              <span class="market-toggle-caret">▼</span>
+              <div class="market-title">${escapeHtml(c.title)}</div>
+            </div>
+            <div class="market-tag">${escapeHtml(c.tag)}</div>
+          </div>
+          <div class="market-content">
+            ${bodyHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="derived-cup-panel">
+        <div class="derived-cup-header">
+          <h3>Derived Cup Markets <span class="derived-cup-hint">· derived from Cup prices</span></h3>
+        </div>
+        <div class="markets-grid">${cardsHtml}</div>
+      </div>
+    `;
+  }
+
+  function buildPairedBody(market) {
+    const pairsHtml = market.pairs.map((p, idx) => `
+      ${idx > 0 ? '<div class="pair-divider"></div>' : ''}
+      ${p.legs.map(renderRow).join('')}
+      <div class="pair-margin">${renderMarginBadge(p.margin)}</div>
+    `).join('');
+    return `
+      <div class="col-headers"><span>Selection</span><span>Prob</span><span>Dec</span><span>US</span></div>
+      <div class="market-body">${pairsHtml}</div>
+    `;
+  }
+
+  function buildExactBody(market) {
+    const rowsHtml = market.legs.map(renderRow).join('');
+    return `
+      <div class="col-headers"><span>Selection</span><span>Prob</span><span>Dec</span><span>US</span></div>
+      <div class="market-body">${rowsHtml}</div>
+      <div class="market-footer">
+        <span class="market-footer-label">Overall Margin</span>
+        ${renderMarginBadge(market.overallMargin)}
+      </div>
+    `;
+  }
+
+  function wireDerivedCupMarkets() {
+    document.querySelectorAll('[data-toggle-derived-cup]').forEach(header => {
+      header.addEventListener('click', () => {
+        const key = header.getAttribute('data-toggle-derived-cup');
+        const card = header.closest('.market');
+        const isCollapsed = card.classList.toggle('collapsed');
+        if (isCollapsed) PRICING_DERIVED_CUP_COLLAPSED.add(key);
+        else PRICING_DERIVED_CUP_COLLAPSED.delete(key);
+      });
+    });
+  }
+
   // Pricing page is read-only for outrights — no controls to wire.
   function wireOutrightControls() {
-    // Intentionally empty. Editing is in admin only.
+    // Cup price editing happens in admin only — but the derived markets panel
+    // does have collapsible toggles that need wiring.
+    wireDerivedCupMarkets();
   }
 
   function renderRow(leg) {

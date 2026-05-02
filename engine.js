@@ -1065,6 +1065,166 @@
     };
   }
 
+  // -------- Derived Cup Markets --------
+  // Five markets that derive directly from the per-team Stanley Cup probabilities
+  // (post-override, post-bias). All return the same shape used by computeMarkets:
+  //   { type: 'paired'|'exact', overallMargin, legs/pairs }
+  //
+  // SCF Exact Result uses an independence assumption between East and West outcomes:
+  //   P(matchup E vs W AND E wins) = scfFair[E] * confFair[W]
+  //   P(matchup E vs W AND W wins) = scfFair[W] * confFair[E]
+  // This is exact when East and West bracket outcomes are independent, which is
+  // true given the bracket structure (no inter-conference series until SCF).
+  function computeDerivedCupMarkets(workingData, outrights, teamsTable) {
+    const T = teamsTable || (typeof window !== 'undefined' && window.NHL_TEAMS) || {};
+    const margin = workingData.defaults.margin;
+    const teams = outrights.teams || [];
+
+    // Helper: bucket teams by a key function and sum their Cup probabilities.
+    // Returns array of { label, fair, key } sorted by fair desc.
+    const bucketByKey = (keyFn, labels) => {
+      const buckets = {};
+      labels.forEach(lbl => { buckets[lbl] = 0; });
+      teams.forEach(t => {
+        const k = keyFn(t);
+        if (k && buckets.hasOwnProperty(k)) {
+          buckets[k] += t.fairWinStanleyCup || 0;
+        }
+      });
+      return labels.map(lbl => ({ label: lbl, fair: buckets[lbl], key: lbl }));
+    };
+
+    // Renormalize an array of probabilities to sum to 1 (defensive — Cup probs
+    // may not sum exactly to 1 after overrides + biases in edge cases).
+    const renormalize = (arr) => {
+      const sum = arr.reduce((a, b) => a + (b.fair || 0), 0);
+      if (sum <= 0) return arr;
+      return arr.map(x => ({ ...x, fair: x.fair / sum }));
+    };
+
+    // ----- 1. Conference of Stanley Cup Winner (2-way) -----
+    let confLegs = bucketByKey(t => t.conference, ['East', 'West']);
+    confLegs = renormalize(confLegs);
+    confLegs = confLegs.map(l => ({ ...l, label: l.label === 'East' ? 'Eastern Conference' : 'Western Conference' }));
+    const confMarginPct = margin.conferenceOfCupWinner || 0.05;
+    const confOffered = applyMargin(confLegs.map(l => l.fair), confMarginPct);
+    const conferenceOfCupWinner = {
+      type: 'paired',
+      pairs: [{
+        margin: confOffered.reduce((a, b) => a + b, 0) - 1,
+        legs: confLegs.map((l, i) => ({ label: l.label, fair: l.fair, offered: confOffered[i] }))
+      }]
+    };
+
+    // ----- 2. Division of Stanley Cup Winner (4-way) -----
+    let divLegs = bucketByKey(t => {
+      const meta = T[t.short];
+      return meta ? meta.division : null;
+    }, ['Atlantic', 'Metropolitan', 'Central', 'Pacific']);
+    divLegs = renormalize(divLegs);
+    const divMarginPct = margin.divisionOfCupWinner || 0.08;
+    const divOffered = applyMargin(divLegs.map(l => l.fair), divMarginPct);
+    const divisionOfCupWinner = {
+      type: 'exact',
+      overallMargin: divOffered.reduce((a, b) => a + b, 0) - 1,
+      legs: divLegs.map((l, i) => ({ label: l.label, fair: l.fair, offered: divOffered[i] }))
+    };
+
+    // ----- 3. Country of Stanley Cup Winner (2-way) -----
+    let countryLegs = bucketByKey(t => {
+      const meta = T[t.short];
+      return meta ? meta.country : null;
+    }, ['USA', 'CAN']);
+    countryLegs = renormalize(countryLegs);
+    countryLegs = countryLegs.map(l => ({ ...l, label: l.label === 'USA' ? 'United States' : 'Canada' }));
+    const countryMarginPct = margin.countryOfCupWinner || 0.05;
+    const countryOffered = applyMargin(countryLegs.map(l => l.fair), countryMarginPct);
+    const countryOfCupWinner = {
+      type: 'paired',
+      pairs: [{
+        margin: countryOffered.reduce((a, b) => a + b, 0) - 1,
+        legs: countryLegs.map((l, i) => ({ label: l.label, fair: l.fair, offered: countryOffered[i] }))
+      }]
+    };
+
+    // ----- 4. First-Time Stanley Cup Winner (2-way Yes/No) -----
+    let pYes = 0, pNo = 0;
+    teams.forEach(t => {
+      const meta = T[t.short];
+      const eligible = meta && meta.firstTimeEligible;
+      if (eligible) pYes += t.fairWinStanleyCup || 0;
+      else pNo += t.fairWinStanleyCup || 0;
+    });
+    // Renormalize defensively
+    const totalFt = pYes + pNo;
+    if (totalFt > 0) { pYes /= totalFt; pNo /= totalFt; }
+    const ftMarginPct = margin.firstTimeCupWinner || 0.06;
+    const ftOffered = applyMargin([pYes, pNo], ftMarginPct);
+    const firstTimeCupWinner = {
+      type: 'paired',
+      pairs: [{
+        margin: ftOffered.reduce((a, b) => a + b, 0) - 1,
+        legs: [
+          { label: 'Yes', fair: pYes, offered: ftOffered[0] },
+          { label: 'No',  fair: pNo,  offered: ftOffered[1] }
+        ]
+      }]
+    };
+
+    // ----- 5. Stanley Cup Finals Exact Result (up to 8x8x2 = 128) -----
+    const eastTeams = teams.filter(t => t.conference === 'East');
+    const westTeams = teams.filter(t => t.conference === 'West');
+    const exactLegs = [];
+    eastTeams.forEach(E => {
+      westTeams.forEach(W => {
+        const fairEwins = (E.fairWinStanleyCup || 0) * (W.fairWinConference || 0);
+        const fairWwins = (W.fairWinStanleyCup || 0) * (E.fairWinConference || 0);
+        exactLegs.push({
+          label: (E.name || E.short) + ' def. ' + (W.name || W.short),
+          fair: fairEwins,
+          winner: E.short, vs: W.short
+        });
+        exactLegs.push({
+          label: (W.name || W.short) + ' def. ' + (E.name || E.short),
+          fair: fairWwins,
+          winner: W.short, vs: E.short
+        });
+      });
+    });
+
+    // Renormalize exact-result legs (the joint distribution should sum to 1
+    // by construction, but renormalize defensively for numerical stability).
+    const exactSum = exactLegs.reduce((a, b) => a + b.fair, 0);
+    if (exactSum > 0) {
+      exactLegs.forEach(l => { l.fair /= exactSum; });
+    }
+
+    // Apply margin to all legs together. Sort by fair desc so most-likely
+    // matchups appear at the top of the rendered card.
+    exactLegs.sort((a, b) => b.fair - a.fair);
+    const exactMarginPct = margin.scfExactResult || 0.20;
+    const exactOffered = applyMargin(exactLegs.map(l => l.fair), exactMarginPct);
+    const scfExactResult = {
+      type: 'exact',
+      overallMargin: exactOffered.reduce((a, b) => a + b, 0) - 1,
+      legs: exactLegs.map((l, i) => ({
+        label: l.label,
+        fair: l.fair,
+        offered: exactOffered[i],
+        winner: l.winner,
+        vs: l.vs
+      }))
+    };
+
+    return {
+      conferenceOfCupWinner,
+      divisionOfCupWinner,
+      countryOfCupWinner,
+      firstTimeCupWinner,
+      scfExactResult
+    };
+  }
+
   // -------- CSV Export --------
   // Maps a series ID to its 1-8 slot number per Tim's cheat sheet convention:
   //   Slot 1, 2 → Metropolitan division (East)
@@ -1319,6 +1479,7 @@
     resolveMargin,
     computeMarkets,
     computeOutrights,
+    computeDerivedCupMarkets,
     americanInputToProb,
     normalize,
     applyConferenceBiases,
