@@ -773,18 +773,46 @@
     return margin;
   }
 
-  function computeOutrights(workingData) {
+  // computeOutrights options:
+  //   ignoreOverrides (default false): when true, skips the trader-anchor pipeline
+  //     and uses pure model probabilities. Used by pricing.html to show live model
+  //     values that update as bracket state and per-game prices change. Admin uses
+  //     the default (overrides + biases anchor displayed prices).
+  function computeOutrights(workingData, options) {
+    const opts = options || {};
+    const ignoreOverrides = !!opts.ignoreOverrides;
     const conn = workingData.bracketConnections;
     const series = workingData.series;
     const defaults = workingData.defaults;
 
-    // Compute series win prob for a given (top, bot) matchup using derived per-game
-    // probabilities, starting from initialState (default 0-0). Standard Markov chain.
-    function derivedSeriesWinProb(topShort, botShort, initialState) {
+    // Compute series win prob for a given (top, bot) matchup. If `series` is
+    // provided AND it matches the slotted teams AND it's in manual mode, uses
+    // the trader-edited per-game prices. Otherwise falls back to MoneyPuck-
+    // derived per-game prices (correct behavior for hypothetical future matchups
+    // where no manual price exists yet). Standard Markov chain forward from
+    // initialState (default 0-0).
+    function derivedSeriesWinProb(topShort, botShort, initialState, slottedSeries) {
       const start = initialState || { topWins: 0, botWins: 0 };
       // If already complete, return deterministic
       if (start.topWins >= 4) return 1.0;
       if (start.botWins >= 4) return 0.0;
+
+      // Decide which per-game-prob source to use. Manual mode requires the slotted
+      // series object AND the matchup must match (so hypothetical pairings still
+      // fall through to MoneyPuck).
+      const useManual = slottedSeries
+        && slottedSeries.mode === 'manual'
+        && slottedSeries.topSeed && slottedSeries.botSeed
+        && slottedSeries.topSeed.short === topShort
+        && slottedSeries.botSeed.short === botShort;
+
+      const probTopWinsGame = (gameNum) => {
+        if (useManual) {
+          return topWinProbForGame(slottedSeries, gameNum);
+        }
+        return derivedTopWinProbForGame(topShort, botShort, isTopHome(gameNum));
+      };
+
       // Run Markov forward from current state
       let P = {};
       const startKey = start.topWins + ',' + start.botWins;
@@ -792,7 +820,7 @@
       const startGameTotal = start.topWins + start.botWins;
       for (let g = startGameTotal; g < 7; g++) {
         const gameNum = g + 1;
-        const pTopGame = derivedTopWinProbForGame(topShort, botShort, isTopHome(gameNum));
+        const pTopGame = probTopWinsGame(gameNum);
         const pBotGame = 1 - pTopGame;
         const newP = {};
         for (const key of Object.keys(P)) {
@@ -845,10 +873,13 @@
             if (tShort === bShort) continue; // same team can't face itself
             const pairProb = pT * pB;
             if (pairProb === 0) continue;
-            // Use current state ONLY if this matchup matches the actual slotted teams
+            // Use current state ONLY if this matchup matches the actual slotted teams.
+            // Same goes for manual per-game prices: only honored when this is the
+            // actual slotted matchup (hypothetical pairings use MoneyPuck math).
             const slottedMatch = s.topSeed.short === tShort && s.botSeed.short === bShort;
             const useState = slottedMatch ? s.state : { topWins: 0, botWins: 0 };
-            const pTopWins = derivedSeriesWinProb(tShort, bShort, useState);
+            const slottedSeries = slottedMatch ? s : null;
+            const pTopWins = derivedSeriesWinProb(tShort, bShort, useState, slottedSeries);
             result[tShort] = (result[tShort] || 0) + pairProb * pTopWins;
             result[bShort] = (result[bShort] || 0) + pairProb * (1 - pTopWins);
           }
@@ -911,8 +942,9 @@
     }
 
     // 2. Trader overrides: stored as { TEAMSHORT: probability } in workingData.outrightOverrides.scf
-    const overrides = (workingData.outrightOverrides && workingData.outrightOverrides.scf) || {};
-    const cupBiases = (workingData.outrightBiases && workingData.outrightBiases.scf) || {};
+    // When ignoreOverrides is set, treat overrides + biases as empty so the model drives.
+    const overrides = ignoreOverrides ? {} : ((workingData.outrightOverrides && workingData.outrightOverrides.scf) || {});
+    const cupBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.scf) || {});
 
     // Build the SCF fair column: model + overrides, with eliminated teams forced to 0.
     let scfFair = { ...modelScfFair };
@@ -982,8 +1014,9 @@
     let westConfFair = deriveConfFair(modelWestFair, modelScfFair, scfFair, westConfTeams);
 
     // 5. Apply conference biases and renormalize
-    const eastBiases = (workingData.outrightBiases && workingData.outrightBiases.eastConf) || {};
-    const westBiases = (workingData.outrightBiases && workingData.outrightBiases.westConf) || {};
+    // When ignoreOverrides is set, biases are skipped so the model drives.
+    const eastBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.eastConf) || {});
+    const westBiases = ignoreOverrides ? {} : ((workingData.outrightBiases && workingData.outrightBiases.westConf) || {});
     eastConfFair = applyConferenceBiases(eastConfFair, eastBiases);
     westConfFair = applyConferenceBiases(westConfFair, westBiases);
 

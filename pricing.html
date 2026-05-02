@@ -1267,8 +1267,13 @@
   }
 
   // ===== RENDER: outrights / futures view =====
+  // Pricing.html shows the live MODEL view: Cup probabilities driven by the bracket
+  // walk (which incorporates the trader's manual per-game prices and current state).
+  // Trader overrides + conference biases are intentionally ignored here — those live
+  // in admin.html where they anchor the displayed prices. As series state changes
+  // and per-game prices are edited, this view updates automatically.
   function renderOutrightsView() {
-    const o = E.computeOutrights(workingData);
+    const o = E.computeOutrights(workingData, { ignoreOverrides: true });
 
     const renderTeamRow = (team, probField, offeredField, biasField) => {
       const fair = team[probField];
@@ -1341,7 +1346,8 @@
   const PRICING_DERIVED_CUP_COLLAPSED = new Set(['scfExactResult']);
 
   function renderDerivedCupMarkets() {
-    const o = E.computeOutrights(workingData);
+    // Same as renderOutrightsView: use pure model so derived markets update live.
+    const o = E.computeOutrights(workingData, { ignoreOverrides: true });
     const teamsTable = (typeof NHL_TEAMS !== 'undefined') ? NHL_TEAMS : null;
     let d;
     try {
