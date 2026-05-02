@@ -329,7 +329,9 @@
       settled: settledG3,
       overallMargin: ag3Offered.reduce((a, b) => a + b, 0) - 1,
       legs: ag3StatesList.map(([i, j], idx) => ({
-        label: topName + ' ' + i + '-' + j + ' ' + botName,
+        // Show only the leading team's name, with their score first.
+        // States [3,0]/[2,1] = top leads; [1,2]/[0,3] = bot leads.
+        label: i > j ? (topName + ' ' + i + '-' + j) : (botName + ' ' + j + '-' + i),
         fair: ag3Fair[idx],
         offered: ag3Offered[idx],
         current: realizedG3 && realizedG3[0] === i && realizedG3[1] === j
@@ -353,8 +355,9 @@
       overallMargin: ag4Offered.reduce((a, b) => a + b, 0) - 1,
       legs: ag4StatesList.map(([i, j], idx) => {
         let label;
-        if (i === 4) label = topName + ' 4-0 (Sweep)';
-        else if (j === 4) label = botName + ' 4-0 (Sweep)';
+        // 4-0 outcomes: just team name + score (no "Sweep" suffix).
+        if (i === 4) label = topName + ' 4-0';
+        else if (j === 4) label = botName + ' 4-0';
         else if (i === j) label = 'Tied 2-2';
         else if (i > j) label = topName + ' ' + i + '-' + j;
         else label = botName + ' ' + j + '-' + i;
@@ -459,11 +462,13 @@
     const g1AndSeries = {
       type: 'exact',
       overallMargin: g1ParlayOffered.reduce((a, b) => a + b, 0) - 1,
+      // Label format: "G1 winner / Series winner". Market name carries the context
+      // ("Game 1/Series Winner Parlay") so no need to repeat "G1" / "Series" here.
       legs: [
-        { label: topName + ' G1 + ' + topName + ' Series', fair: g1ParlayFair[0], offered: g1ParlayOffered[0] },
-        { label: topName + ' G1 + ' + botName + ' Series', fair: g1ParlayFair[1], offered: g1ParlayOffered[1] },
-        { label: botName + ' G1 + ' + topName + ' Series', fair: g1ParlayFair[2], offered: g1ParlayOffered[2] },
-        { label: botName + ' G1 + ' + botName + ' Series', fair: g1ParlayFair[3], offered: g1ParlayOffered[3] }
+        { label: topName + ' / ' + topName, fair: g1ParlayFair[0], offered: g1ParlayOffered[0] },
+        { label: topName + ' / ' + botName, fair: g1ParlayFair[1], offered: g1ParlayOffered[1] },
+        { label: botName + ' / ' + topName, fair: g1ParlayFair[2], offered: g1ParlayOffered[2] },
+        { label: botName + ' / ' + botName, fair: g1ParlayFair[3], offered: g1ParlayOffered[3] }
       ]
     };
 
@@ -1418,17 +1423,11 @@
 
     // 8. Game 1 / Series Winner Parlay (4 selections — skip if G1 played, since 2 of 4 settle to 0)
     if (playedCount < 1 && m.g1AndSeries && m.g1AndSeries.legs) {
+      // Engine labels are already in "<G1 winner> / <Series winner>" format.
+      // Reorder to cheat sheet sequence: top/top, bot/bot, top/bot, bot/top.
       const g1 = m.g1AndSeries.legs;
-      // Cheat sheet order: top/top, bot/bot, top/bot, bot/top
-      // Engine order: [top G1+top, top G1+bot, bot G1+top, bot G1+bot]
-      // Selection format: "<topFull> / <topFull>", etc.
       const g1Lookup = {};
-      g1.forEach(leg => {
-        // Leg labels are "<topFull> G1 + <topFull> Series", etc.
-        // Convert to cheat sheet format "<TeamA> / <TeamB>"
-        const match = leg.label.match(/^(.+) G1 \+ (.+) Series$/);
-        if (match) g1Lookup[match[1] + ' / ' + match[2]] = leg.offered;
-      });
+      g1.forEach(leg => { g1Lookup[leg.label] = leg.offered; });
       const g1Order = [
         topFull + ' / ' + topFull,
         botFull + ' / ' + botFull,
@@ -1510,4 +1509,4 @@
     module.exports = global.PlayoffsEngine;
   }
 
-})(typeof window !== 'undefined' ? window : globalThis);balThis);
+})(typeof window !== 'undefined' ? window : globalThis);
