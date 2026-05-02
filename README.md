@@ -1,179 +1,342 @@
-# NHL Playoffs Pricing Suite
+# NHL Playoffs Pricing Tool — User Guide
 
-Two-tool system for live series pricing across all 15 NHL Playoff series, backed by a single config file in this repo.
+A guide for the BetFanatics trading team. This tool prices every market we offer for NHL playoff series — series winners, correct scores, totals, spreads, after-game-N states, parlays, futures (Cup, Conference, Division, Country, First-Time Winner, SCF Exact Result), and outputs a CSV that uploads directly into NATS.
 
-Built for BetFanatics Trading.
+This guide assumes you have never used GitHub before. If a step looks unfamiliar, follow it exactly — there are no shortcuts you're missing.
 
-## What's in here
+────────────────────────────────────────
 
-| File | Purpose |
-|------|---------|
-| `pricing.html` | Public pricing tool. Read-only, what the trading team uses. |
-| `admin.html` | Admin/editor tool. Password-gated, exports updated config. |
-| `playoffs.js` | The single source of truth. All 15 series, current state, prices. |
-| `engine.js` | Shared math engine (Markov chain, odds conversion, market computation). |
-| `README.md` | This file. |
+## What the tool is
 
-## Live URLs (after GitHub Pages setup)
+There are two web pages that work together:
 
-- Pricing: `https://timnaval-dev.github.io/<repo>/pricing.html`
-- Admin: `https://timnaval-dev.github.io/<repo>/admin.html`
+PRICING — https://timnaval-dev.github.io/betfanatics-playoffs/pricing.html
+    Used by anyone on the trading team.
+    Read-only view of all live prices. Updates dynamically as the model and bracket state change.
 
-## Setup (one-time)
+ADMIN — https://timnaval-dev.github.io/betfanatics-playoffs/admin.html
+    Used by the person setting prices (one designated trader at a time).
+    Edit per-game prices, add wins, anchor Cup prices, apply biases, export the CSV for NATS, export an updated playoffs.js to commit back to the repo.
 
-1. Create a new public GitHub repo (e.g. `betfanatics-playoffs`) under `timnaval-dev`.
-2. Drop these 5 files into the repo root.
-3. Commit and push.
-4. In repo Settings → Pages → Source: `main` branch, root folder. Save.
-5. Wait ~1 minute. Pages URLs go live.
-6. Share `pricing.html` URL with the trading team. Keep `admin.html` URL for yourself.
+The data behind both pages lives in a single file: playoffs.js, stored in this GitHub repo:
+https://github.com/timnaval-dev/betfanatics-playoffs
 
-## How to update settings (the day-to-day flow)
+When you "save" your work, you're committing a new version of playoffs.js to GitHub. Once committed, GitHub Pages auto-deploys both pages within 1–2 minutes — so the rest of the team sees the new prices on pricing.html.
 
-When a game settles, prices need adjusting, or a series ends and you want to populate the next round:
+────────────────────────────────────────
 
-1. Open `admin.html` in your browser.
-2. Enter password: **`Tech`**
-3. Navigate to the affected series via round + series tabs.
-4. Make your edits:
-   - **Team names / short codes**: Identity panel
-   - **Home win % sliders or per-game odds**: Pricing Inputs panel (toggle Auto / Manual)
-   - **Advance series state**: Series State panel (use Top Wins / Bottom Wins buttons)
-   - **Margin overrides**: Margin Overrides panel (leave blank for default)
-5. The yellow banner at the top will show "N series modified".
-6. Click **Export new playoffs.js**.
-7. In the modal:
-   - Click **Download .js File** to save locally and drag into your repo clone, OR
-   - Click **Copy to Clipboard** and paste directly into the GitHub web editor for `playoffs.js`
-8. Commit. GitHub Pages updates within ~30 seconds. Live for the team.
+## Daily workflow at a glance
 
-## How rounds advance (no-reseed bracket)
+1. Open admin.html in your browser (link above).
+2. Make your edits — wins, per-game prices, Cup anchors, biases, whatever needs to change.
+3. Click "Export new playoffs.js" in the top right. A file called playoffs.js downloads to your computer.
+4. Go to GitHub, paste the new file in, and click "Commit changes".
+5. Wait 1–2 minutes. Refresh pricing.html and verify your changes are live.
 
-The tool follows standard NHL bracket structure (post-2014, no reseeding):
+That's the whole loop. The rest of this guide explains each step in detail.
 
-```
-Round 1               Round 2              Conf Final         Stanley Cup
-─────────────────────────────────────────────────────────────────────────
-EAST
-Atlantic 1 vs WC2  ┐
-                   ├── Atlantic Final ┐
-Atlantic 2 vs 3    ┘                  │
-                                      ├── Eastern Final ┐
-Metro 1 vs WC1     ┐                  │                 │
-                   ├── Metro Final ───┘                 │
-Metro 2 vs 3       ┘                                    │
-                                                        ├── Stanley Cup
-WEST                                                    │
-Central 1 vs WC2   ┐                                    │
-                   ├── Central Final ─┐                 │
-Central 2 vs 3     ┘                  │                 │
-                                      ├── Western Final ┘
-Pacific 1 vs WC1   ┐                  │
-                   ├── Pacific Final ─┘
-Pacific 2 vs 3     ┘
-```
+────────────────────────────────────────
 
-When a Round 1 series ends in admin, navigate to the corresponding Round 2 series. A green **Bracket Advance Available** panel appears with two options:
+## Setting up access (one-time, do this first)
 
-- **Place [Winner] as Top Seed** (default — better seed becomes home in G1, G2, G5, G7)
-- **Place [Winner] as Bottom Seed** (use if needed for re-seeding edge cases)
+Before you can edit anything, you need a GitHub account that has been added as a collaborator on this repo.
 
-Same flow for promoting Round 2 winners into Conference Finals, and Conference Finals winners into the Stanley Cup Final.
+### 1. Create a GitHub account
 
-## Manual mode
+If you already have one, skip to step 2.
 
-Each series has two pricing modes:
+1. Go to https://github.com/signup
+2. Use your work email address.
+3. Pick any username — it doesn't have to be your real name.
+4. Verify your email.
 
-- **Auto (Sliders)**: Set Top Seed Home Win % and Bottom Seed Home Win %. The tool derives the 7 game probabilities from the home pattern (G1/G2/G5/G7 = top home, G3/G4/G6 = bot home).
-- **Manual (Per Game)**: Set the Top Seed's win odds directly for each of the 7 games (American odds format like `-150` or `+120`). Markov chain pulls those 7 numbers directly. Change any one game's price → all markets recompute.
+### 2. Get added as a collaborator
 
-Switching from Auto to Manual auto-populates the 7 game inputs from current sliders, so you don't lose context.
+Send your GitHub username to Tim in Slack. Tim will go to the repo settings, click "Manage access," and invite you. You'll get an email invitation — click "Accept invitation."
 
-## Markets shown
+Until this is done, you can view the repo but you cannot save changes.
 
-Each series renders 8 market cards:
+### 3. Bookmark these three URLs
 
-| Market | Type | Margin display |
-|--------|------|----------------|
-| Series Winner | 2-way | Pair margin badge |
-| Correct Score | 8-way exact | Overall margin badge |
-| Total Games (O/U) | 3 paired O/U lines (4.5, 5.5, 6.5) | Per-pair margin badges |
-| Exact Games | 4-way (4, 5, 6, 7 games) | Overall margin badge |
-| Series Spreads | 6 paired (±1.5/2.5/3.5 each side) | Per-pair margin badges |
-| Series Score After Game 3 | 4-way (settles after G3) | Overall margin badge |
-| Series Score After Game 4 | 5-way (settles after G4) | Overall margin badge |
-| From Behind / Never Trail | 4-way | Overall margin badge |
+- Admin: https://timnaval-dev.github.io/betfanatics-playoffs/admin.html
+- Pricing: https://timnaval-dev.github.io/betfanatics-playoffs/pricing.html
+- GitHub repo: https://github.com/timnaval-dev/betfanatics-playoffs
 
-Margin badge colors:
+Put them in a browser folder labeled "NHL Playoffs Tool."
 
-- **Green**: 0–6% (typical)
-- **Amber**: 6–10% (high)
-- **Red**: >10% (very high)
-- **Purple/dim**: <0% (underround — usually a config error)
+────────────────────────────────────────
 
-## Default margins (overridable per series)
+## How the admin page is organized
 
-Set in `playoffs.js` under `defaults.margin`:
+When you open admin.html, you'll see this structure:
 
-| Market | Default |
-|--------|---------|
-| Series Winner | 5% |
-| Correct Score | 8% |
-| Total Games O/U | 5% |
-| Exact Games | 8% |
-| Spreads | 5% |
-| After Game 3 | 6% |
-| After Game 4 | 6% |
-| From Behind / Never Trail | 6% |
+TOP BAR (always visible)
+- Round tabs: Round 1, Round 2, Conference Finals, Stanley Cup Final, Outrights
+- Series tabs: appear within each round (e.g., "BUF vs BOS")
+- Action buttons (top right): Export current series CSV · Export all series CSV · Initialize bracket from standings · Export new playoffs.js
 
-Override per series in admin tool's Margin Overrides panel.
+WITHIN EACH SERIES TAB (Round 1 / Round 2 / etc.)
+1. Identity panel — top and bottom team for the series
+2. Inputs panel — choose Derived mode (auto-priced from MoneyPuck power scores) or Manual mode (you set per-game probabilities)
+3. State panel — the current series score (use + and − buttons to add/remove wins)
+4. Margin panel — override the default margin for any market on this series
+5. Live markets panel — live preview of every market this series produces (Series Winner, Correct Score, Spreads, etc.). Updates as you edit. Cards are collapsible — Series Winner is open by default.
 
-## Editing without admin tool (advanced)
+WITHIN THE OUTRIGHTS TAB
+1. Eastern Conference Winner card — 8 teams, model-derived probabilities adjusted by your bias inputs
+2. Western Conference Winner card — same idea for the West
+3. Stanley Cup Winner card — all 16 playoff teams
+4. Stanley Cup Prices (trader anchors) — the editor where you type Cup prices and conference biases per team
+5. Derived Cup Markets — five markets that derive from Cup prices: Conference of Cup Winner, Division, Country, First-Time Winner, SCF Exact Result
 
-`playoffs.js` is plain JS. You can edit it by hand if you prefer. Key fields per series:
+────────────────────────────────────────
 
-```js
-{
-  topSeed: { name: "Capitals", short: "WSH" },
-  botSeed: { name: "Canadiens", short: "MTL" },
-  mode: "auto",                                      // or "manual"
-  auto:   { topHomeWinPct: 0.62, botHomeWinPct: 0.45 },
-  manual: { game1: 0.62, game2: 0.62, ... game7: 0.62 },
-  state:  { topWins: 2, botWins: 1, history: [[0,0],[1,0],[2,0],[2,1]] },
-  margin: { seriesWinner: 0.04 }                     // overrides only
-}
-```
+## Common edits
 
-Just keep the file structure intact (don't break the JSON-shaped object) and reload `pricing.html`.
+### A game just finished — record the result
 
-## Math model
+1. Open admin.html.
+2. Click the round tab (e.g., "Round 2").
+3. Click the series tab (e.g., "CAR vs PHI").
+4. Find the State panel.
+5. Click the +1 win button under the team that won.
+6. Verify the score updates correctly.
+7. Export and commit (see "Saving your changes" below).
 
-The tool runs a Markov chain on series state. From the current `(topWins, botWins)`, each game has a P(top wins) value that determines the transition. Walking the chain forward gives the probability of reaching every possible end state, which is then aggregated into the various market shapes.
+That's it. The Live Markets panel below will instantly recompute all the after-game-N prices, parlays, and series winner odds.
 
-Margins are applied proportionally: fair probabilities are scaled so their sum equals `1 + margin`, then individual offered prices are computed.
+### You disagree with the auto-priced game line
 
-For "Never Trail" markets, a constrained Markov walk is used that excludes any path crossing through a state where the chosen team is behind.
+By default, every series starts in Derived mode — game-by-game home win probabilities come from MoneyPuck power scores. If you think the model is wrong on a specific series:
 
-## Troubleshooting
+1. Open the series tab.
+2. In the Inputs panel, switch from Derived to Manual.
+3. The per-game grid becomes editable. Each cell is the probability that the home team wins that specific game.
+4. Type your own probabilities (any number between 0.01 and 0.99 — for example, 0.65 means 65% home win probability for that game).
+5. The Live Markets panel below updates as you type.
 
-- **Admin won't unlock**: Password is exactly `Tech` (capital T, no quotes). Stored in `sessionStorage` once unlocked, lasts until browser tab closes.
-- **Export modal looks broken**: The textarea is read-only; use the Copy or Download buttons.
-- **Pricing tool shows old data**: Hard-refresh (Cmd+Shift+R / Ctrl+Shift+R). GitHub Pages cache can take a minute.
-- **Markets show negative margins**: Either you set a margin <0% in admin, or there's a bug. Default to 5% in admin's margin override field if unsure.
-- **Manual input rejected**: Use American odds format only. `-150`, `+120`, `100`. Don't include "$" or "%". Empty input keeps the existing value.
+You can flip back to Derived at any time. Your manual values are remembered if you flip back to Manual later in the same session.
 
-## Discarding admin changes
+### Adjust a Stanley Cup price (anchor a team)
 
-In admin tool, "Discard Changes" button reverts to whatever's currently in `playoffs.js` on the page. Useful if you start poking around and want to reset.
+On the Outrights tab, the Cup Prices editor lets you set a specific American odds price for any team. Once set, that team's Cup probability is locked at that value (the model still drives unanchored teams).
 
-If you've already exported but want to undo, use git history to roll `playoffs.js` back. (No versioned backups in-app; rely on git.)
+1. Click the Outrights round tab.
+2. Find the team in the Cup Prices editor.
+3. Type the price in American odds in the team's input box (e.g., +450 or -110).
+4. Hit Tab or click outside the box.
+5. The team is now "anchored" — you'll see a SET badge appear next to their row.
 
-## Future enhancements (not currently built)
+To unanchor a team and let the model drive again, click the ↺ button next to their row, or delete the value from the input.
 
-- OT and players props per series
-- Bet builder / SGP combinations
-- Real-time pull from feeds
-- User-specific margin presets
+### Apply a conference bias
 
-If you want any of these, ping me.
-](https://timnaval-dev.github.io/betfanatics-playoffs/pricing.html)
+A conference bias adds (or subtracts) a percentage point to a team's conference probability without changing their Cup probability. Useful when you think the model is too low/high on a team's chances of reaching the Cup Final.
+
+1. On the Outrights tab, find the team's row.
+2. Use the bias slider in their row (range: −5pp to +5pp, in 0.1pp increments).
+3. The probability will update immediately. The bias persists until you reset it manually.
+
+Biases are independent of Cup price overrides. They will stick around even if you click "Clear Cup overrides only."
+
+### Reset everything (start fresh)
+
+Two reset buttons live in the Cup Prices editor:
+
+CLEAR CUP OVERRIDES ONLY — Removes all Cup price anchors. Model drives all Cup probabilities. Conference biases are preserved.
+
+RESET EVERYTHING — Removes all Cup overrides AND all conference biases.
+
+Both will ask you to confirm before doing anything destructive.
+
+────────────────────────────────────────
+
+## Saving your changes (the GitHub commit step)
+
+This is where most non-technical users get stuck. Follow the steps exactly.
+
+### Step 1 — Export the new playoffs.js
+
+1. In admin.html, click "Export new playoffs.js" (top right).
+2. A file called playoffs.js will download to your computer (usually to your Downloads folder).
+3. Find the file. Don't open it. Don't rename it. Don't change anything inside it.
+
+### Step 2 — Open the file on GitHub
+
+1. Go to https://github.com/timnaval-dev/betfanatics-playoffs
+2. In the file list, click on playoffs.js (the same name as the file you just downloaded).
+3. You'll see the file's contents in a viewer. In the top right of that viewer, click the pencil icon — its label is "Edit this file." If you don't see the pencil, you don't have edit access yet — see "Setting up access" above.
+
+### Step 3 — Replace the contents
+
+1. Click anywhere in the code area.
+2. Press Ctrl+A (Windows) or Cmd+A (Mac) to select all text.
+3. Press Delete or Backspace to clear it.
+4. Open your downloaded playoffs.js file in a text editor (Notepad on Windows, TextEdit on Mac, or any code editor). Don't double-click — that may open it in a browser. Right-click the file and choose "Open With → Notepad" (Windows) or "Open With → TextEdit" (Mac).
+5. Press Ctrl+A / Cmd+A to select all, then Ctrl+C / Cmd+C to copy.
+6. Switch back to the GitHub browser tab.
+7. Click into the empty code area and paste with Ctrl+V / Cmd+V.
+
+### Step 4 — Commit the changes
+
+1. Scroll to the bottom of the page (or click the green "Commit changes..." button at the top right of the code area).
+2. A dialog opens. The first input box ("Commit message") is the description. Type something short and useful, like:
+   - CAR up 1-0 in R2
+   - Updated VGK Cup price to +650
+   - Cleared all overrides post-R1
+3. Leave the radio button on "Commit directly to the main branch".
+4. Click the green "Commit changes" button.
+
+### Step 5 — Wait, then verify
+
+1. Wait 1–2 minutes for GitHub Pages to redeploy.
+2. Open https://timnaval-dev.github.io/betfanatics-playoffs/pricing.html
+3. Hard-refresh the page: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac). A normal refresh might still show the old cached version.
+4. Confirm your changes are visible.
+
+If the page still looks like the old data after 5 minutes, something went wrong — check that you committed to the main branch and that the file you pasted is named exactly playoffs.js.
+
+────────────────────────────────────────
+
+## Exporting CSVs for NATS
+
+Two buttons in the admin top bar produce CSVs in NATS-compatible format:
+
+- Export current series CSV — downloads only the series tab you're currently viewing
+- Export all series CSV — downloads every active, in-progress series in one file
+
+The CSV contains four columns: Market Type, Market Name, Selection, Price (decimal, 5 places). Every selection that needs to be priced gets its own row. The CSV automatically skips:
+
+- Completed series (one team has 4 wins)
+- TBD series (either team unknown)
+- Settled markets within a live series (After Game 3 once Game 3 has played, etc.)
+- Conference finals and Stanley Cup Final (those are outright markets, not in the 1–8 slot system)
+
+The slot numbering follows our cheat sheet:
+- Slots 1, 2 → Metropolitan division (slot 1 = top series, slot 2 = bottom series)
+- Slots 3, 4 → Atlantic division
+- Slots 5, 6 → Central division
+- Slots 7, 8 → Pacific division
+
+Slot 8 is the only slot where Market Type strings get the {playerName} prefix. Everything else uses plain text. This was the cheat sheet's behavior — don't change it unless NATS asks for it.
+
+After downloading the CSV, you can upload it into NATS through the normal market upload flow.
+
+────────────────────────────────────────
+
+## Setting up next season
+
+Hockey reseeds annually. When the 2026–2027 playoffs start, here's what needs to happen:
+
+### Pre-season (before play-in / Round 1 starts)
+
+1. UPDATE STANDINGS in playoffs.js
+
+Find the standings block at the top of playoffs.js. Update each division's array with the top three teams by points (in order). Update wildCardEast and wildCardWest with the two wild card teams in each conference (WC1 first, WC2 second).
+
+If a tie exists between divisions for the conference's #1 seed, the team with more total points takes the higher conference seed. This matters for the bracket — the conference's #1 seed always plays WC2, while the other division winner plays WC1. The admin's "Initialize bracket from standings" button will need this rule baked in if it's not already obvious from points alone.
+
+Example structure (replace teams with the new season's standings):
+
+  "standings": {
+    "atlantic": ["BUF", "TBL", "MTL"],
+    "metropolitan": ["CAR", "PIT", "PHI"],
+    "central": ["COL", "DAL", "MIN"],
+    "pacific": ["VGK", "EDM", "ANA"],
+    "wildCardEast": ["BOS", "OTT"],
+    "wildCardWest": ["UTA", "LAK"]
+  }
+
+2. UPDATE teams.js FOR ANY FRANCHISE CHANGES
+
+If a team relocated, was renamed, or rebranded, update teams.js. Look for the team's three-letter code (e.g., UTA for Utah) and update:
+
+- name: full team name
+- home.primary / home.secondary: jersey colors
+- away.primary / away.secondary: alternate jersey colors
+- country: "USA" or "CAN"
+- firstTimeEligible: true if this franchise has never won a Cup, false otherwise
+
+Then commit teams.js to GitHub the same way you commit playoffs.js.
+
+3. UPDATE MONEYPUCK POWER SCORES in teams.js
+
+Get the latest MoneyPuck team power scores (score, abilityToWin, scoringChances, goaltending) from MoneyPuck's website. Update the power object for every team. This is what the model uses to derive per-game prices in Derived mode.
+
+Commit teams.js.
+
+4. INITIALIZE THE BRACKET
+
+1. Open admin.html.
+2. Click "Initialize bracket from standings" (top right).
+3. Confirm. The bracket auto-seeds the Round 1 matchups based on the standings you put in.
+
+5. RESET ALL OVERRIDES AND BIASES
+
+1. Go to the Outrights tab.
+2. Click "Reset everything" to clear last season's Cup price anchors and conference biases.
+3. Set fresh Cup prices and biases based on this season's prior knowledge.
+
+6. EXPORT AND COMMIT A FRESH playoffs.js
+
+Click "Export new playoffs.js" and commit it to GitHub. This new file becomes the season-opener baseline.
+
+### During the season
+
+The daily workflow described above. Update wins after each game, adjust per-game prices when you disagree with the model, anchor outright Cup prices when you have a strong opinion, export and commit.
+
+────────────────────────────────────────
+
+## When something breaks
+
+PRICING.HTML SHOWS OLD PRICES AFTER I COMMITTED
+→ Hard-refresh with Ctrl/Cmd + Shift + R. Wait 2 minutes after committing. Check that you committed to main branch.
+
+ADMIN WON'T LOAD — BLANK PAGE
+→ The playoffs.js file is malformed. Open the GitHub repo, look at the most recent commit, click "Revert" to roll back to the previous working version.
+
+LIVE MARKETS PANEL SHOWS "COULD NOT COMPUTE MARKETS"
+→ A game state is invalid (e.g., 5–2 series score). Check the State panel and use −1 win to fix.
+
+CUP PRICES IN ADMIN LOOK WRONG
+→ Click "Reset everything" to start fresh. Or use the per-row ↺ button to clear individual anchors.
+
+CSV EXPORT IS EMPTY
+→ All your series are either complete, TBD, or fully settled. The CSV intentionally skips those. Pick a series with wins between 1 and 3.
+
+I MADE A BAD COMMIT AND WANT TO UNDO IT
+→ On GitHub, go to the Commits list (in the file viewer, click the clock icon or "History"). Find your most recent commit. Click into it. Click "Revert" in the top right. Commit the revert.
+
+If none of the above work, ping Tim in Slack with a screenshot.
+
+────────────────────────────────────────
+
+## Glossary
+
+ANCHOR (Cup price override): A trader-set probability for a team's Cup chances. When set, the model stops driving that team's Cup probability and uses your input instead.
+
+BIAS (conference bias): A trader-set adjustment to a team's conference probability, in percentage points. Persists across edits, biases stack on top of model output.
+
+DERIVED MODE: The series uses MoneyPuck-derived per-game prices. Updates automatically with bracket state.
+
+MANUAL MODE: The trader sets per-game prices by hand. Used when you disagree with the model.
+
+SLOT: A 1–8 number that maps a series to its location in our NATS cheat sheet (e.g., slot 1 = Metro top series).
+
+NATS: BetFanatics' market upload system. The CSV exports go here.
+
+MARGIN: The percentage of overround built into each market's offered prices. Defaults are tuned per-market — you can override them per-series.
+
+LIVE MARKETS PANEL: The collapsible panel in admin that previews every market a series produces. Updates as you edit.
+
+DERIVED CUP MARKETS: Five markets that aggregate Cup probabilities into different cuts: Conference, Division, Country, First-Time Winner, SCF Exact Result.
+
+────────────────────────────────────────
+
+## Maintenance
+
+This guide must be kept in sync with the tool. Whenever Tim and Claude make changes to the engine, admin, or pricing pages — including new markets, new buttons, new behaviors, or new defaults — this README and the equivalent Google Doc must be updated in the same session.
+
+Last updated: 2 May 2026
+
+
