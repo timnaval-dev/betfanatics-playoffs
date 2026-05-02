@@ -1199,11 +1199,19 @@
       exactLegs.forEach(l => { l.fair /= exactSum; });
     }
 
-    // Apply margin to all legs together. Sort by fair desc so most-likely
-    // matchups appear at the top of the rendered card.
+    // Sort by fair desc so most-likely matchups appear at the top.
     exactLegs.sort((a, b) => b.fair - a.fair);
-    const exactMarginPct = margin.scfExactResult || 0.20;
-    const exactOffered = applyMargin(exactLegs.map(l => l.fair), exactMarginPct);
+
+    // Per-selection margin: HARDCODED 3 percentage points added to every live
+    // leg's fair probability. Eliminated/unreachable legs (fair = 0) stay at 0.
+    // This intentionally produces a fat overall book — with N live legs the
+    // total book overround is 1 + N * 0.03. Early bracket has many live legs
+    // (40+) so margin is very high; late bracket compresses naturally.
+    // The defaults.margin.scfExactResult value is intentionally IGNORED here.
+    const SCF_EXACT_PER_LEG_MARGIN = 0.03;
+    const exactOffered = exactLegs.map(l =>
+      l.fair > 0 ? Math.min(l.fair + SCF_EXACT_PER_LEG_MARGIN, 0.999) : 0
+    );
     const scfExactResult = {
       type: 'exact',
       overallMargin: exactOffered.reduce((a, b) => a + b, 0) - 1,
@@ -1502,4 +1510,4 @@
     module.exports = global.PlayoffsEngine;
   }
 
-})(typeof window !== 'undefined' ? window : globalThis);
+})(typeof window !== 'undefined' ? window : globalThis);balThis);
