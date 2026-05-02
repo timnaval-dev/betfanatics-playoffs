@@ -1065,7 +1065,243 @@
     };
   }
 
-  // -------- Public API --------
+  // -------- CSV Export --------
+  // Maps a series ID to its 1-8 slot number per Tim's cheat sheet convention:
+  //   Slot 1, 2 → Metropolitan division (East)
+  //   Slot 3, 4 → Atlantic division (East)
+  //   Slot 5, 6 → Central division (West)
+  //   Slot 7, 8 → Pacific division (West)
+  // Within each division: the "1v4" lane uses the odd slot (1, 3, 5, 7) and the
+  // "2v3" lane uses the even slot (2, 4, 6, 8). When a R2 division final is active,
+  // it takes the odd slot (since the bracket survives forward through that lane).
+  // Conference finals (R3) and the Stanley Cup Final are NOT mapped here — they're
+  // outright/futures markets handled separately.
+  const SERIES_SLOT_MAP = {
+    'e1-met-1v4': 1,
+    'e1-met-2v3': 2,
+    'e2-met-final': 1,
+    'e1-atl-1v4': 3,
+    'e1-atl-2v3': 4,
+    'e2-atl-final': 3,
+    'w1-cen-1v4': 5,
+    'w1-cen-2v3': 6,
+    'w2-cen-final': 5,
+    'w1-pac-1v4': 7,
+    'w1-pac-2v3': 8,
+    'w2-pac-final': 7
+  };
+
+  function getSeriesSlot(seriesId) {
+    return SERIES_SLOT_MAP[seriesId] || null;
+  }
+
+  // Generate the exact Market Type strings expected by the cheat sheet, with the
+  // slot number substituted in. The `{playerName}` token (a literal string used
+  // by NATS to inject team/player context) only appears on slot 8 and only on
+  // these 5 markets: Series Winner, Correct Score, When Will Series End,
+  // Handicap, Score After Game 4. All other slots get plain market type strings.
+  function getMarketTypeLabel(marketKind, slot) {
+    const prefix = (slot === 8) ? '{playerName} ' : '';
+    switch (marketKind) {
+      case 'seriesWinner':  return prefix + 'Series Winner ' + slot;
+      case 'correctScore':  return prefix + 'Series Correct Score ' + slot;
+      case 'exactGames':    return prefix + 'When Will Series End ' + slot;
+      case 'spreads':       return prefix + 'Series Handicap ' + slot;
+      case 'afterG4':       return prefix + 'Series Correct Score After Game 4 (' + slot + ')';
+      case 'afterG3':       return 'Series Correct Score After Game 3 (' + slot + ')';
+      case 'totalGamesOU':  return 'Series Total Games ' + slot;
+      case 'g1AndSeries':   return 'Series Winner/Game 1 Parlay ' + slot;
+      case 'fromBehind':    return 'Series To Win From Behind ' + slot;
+      default: return marketKind + ' ' + slot;
+    }
+  }
+
+  // Build a list of {type, name, selection, price} rows for one series.
+  // Skips:
+  //   - Series that are complete (one team has 4 wins)
+  //   - Series where either team is unknown (TBD slots)
+  //   - Settled markets (afterG3 once G3 is played, afterG4 once G4 is played, g1AndSeries once G1 is played)
+  //   - Series that don't have a 1-8 slot (R3 conference finals, SCF — handled separately as outrights)
+  // Decimal precision: 5 places.
+  // For spreads: outputs all 12 selections (top/bot at ±1.5/2.5/3.5).
+  function buildSeriesPropsCSV(series, defaults, seriesId) {
+    const rows = [];
+    if (!series || !series.topSeed || !series.botSeed) return rows;
+    if (!series.topSeed.short || !series.botSeed.short) return rows;
+    const tw = series.state.topWins || 0;
+    const bw = series.state.botWins || 0;
+    if (tw >= 4 || bw >= 4) return rows; // skip complete series
+
+    // Resolve slot from seriesId. If caller didn't pass seriesId, skip.
+    const slot = seriesId ? getSeriesSlot(seriesId) : null;
+    if (!slot) return rows; // No slot mapping (conf finals, SCF, etc.) — skip.
+
+    const m = computeMarkets(series, defaults);
+    const topShort = series.topSeed.short;
+    const botShort = series.botSeed.short;
+    const topFull = series.topSeed.name || topShort;
+    const botFull = series.botSeed.name || botShort;
+    const matchupShort = topShort + ' vs ' + botShort;
+    const playedCount = tw + bw;
+
+    const fmtPrice = (offered) => {
+      if (offered === null || offered === undefined || !isFinite(offered) || offered <= 0) return '';
+      const dec = 1 / offered;
+      return dec.toFixed(5);
+    };
+
+    // Helper to push a row using slot-aware market type
+    const push = (kind, marketName, selection, price) => {
+      rows.push({ type: getMarketTypeLabel(kind, slot), name: marketName, selection, price });
+    };
+
+    // 1. Series Winner (2 selections)
+    push('seriesWinner', matchupShort + ' Series Winner', topFull, fmtPrice(m.seriesWinner.pairs[0].legs[0].offered));
+    push('seriesWinner', matchupShort + ' Series Winner', botFull, fmtPrice(m.seriesWinner.pairs[0].legs[1].offered));
+
+    // 2. Series Correct Score (8 selections, ordered: top 4-0, bot 4-0, top 4-1, bot 4-1, ...)
+    // Engine stores them as: top 4-0, top 4-1, top 4-2, top 4-3, bot 4-0, bot 4-1, bot 4-2, bot 4-3
+    // Cheat sheet order: top 4-0, bot 4-0, top 4-1, bot 4-1, top 4-2, bot 4-2, top 4-3, bot 4-3
+    const cs = m.correctScore.legs;
+    for (let i = 0; i < 4; i++) {
+      push('correctScore', matchupShort + ' Series Correct Score', topFull + ' 4-' + i, fmtPrice(cs[i].offered));
+      push('correctScore', matchupShort + ' Series Correct Score', botFull + ' 4-' + i, fmtPrice(cs[4 + i].offered));
+    }
+
+    // 3. When Will Series End (4 selections: 4 / 5 / 6 / 7 Games)
+    // Engine stores exactGames legs as: 4 games, 5 games, 6 games, 7 games (in order)
+    const eg = m.exactGames.legs;
+    push('exactGames', matchupShort + ' Series Exact Games', '4 Games', fmtPrice(eg[0].offered));
+    push('exactGames', matchupShort + ' Series Exact Games', '5 Games', fmtPrice(eg[1].offered));
+    push('exactGames', matchupShort + ' Series Exact Games', '6 Games', fmtPrice(eg[2].offered));
+    push('exactGames', matchupShort + ' Series Exact Games', '7 Games', fmtPrice(eg[3].offered));
+
+    // 4. Series Spread (12 selections — both teams at ±1.5/2.5/3.5)
+    // Engine returns 6 pairs. Each pair contains 2 legs with the labels we want.
+    // Pairs: [Top -1.5, Bot +1.5], [Top -2.5, Bot +2.5], [Top -3.5, Bot +3.5],
+    //        [Bot -1.5, Top +1.5], [Bot -2.5, Top +2.5], [Bot -3.5, Top +3.5]
+    // Cheat sheet ordering: Top -3.5, Top -2.5, Top -1.5, Top +1.5, Top +2.5, Top +3.5,
+    //                      Bot -3.5, Bot -2.5, Bot -1.5, Bot +1.5, Bot +2.5, Bot +3.5
+    const sp = m.spreads.pairs;
+    // Engine ordering (per createspread): top -1.5/+2.5/+3.5/-3.5 etc — easier to look up by label
+    const spreadLookup = {};
+    sp.forEach(pair => pair.legs.forEach(leg => { spreadLookup[leg.label] = leg.offered; }));
+    const spreadOrder = [
+      topFull + ' -3.5', topFull + ' -2.5', topFull + ' -1.5',
+      topFull + ' +1.5', topFull + ' +2.5', topFull + ' +3.5',
+      botFull + ' -3.5', botFull + ' -2.5', botFull + ' -1.5',
+      botFull + ' +1.5', botFull + ' +2.5', botFull + ' +3.5'
+    ];
+    spreadOrder.forEach(label => {
+      push('spreads', matchupShort + ' Series Spread', label, fmtPrice(spreadLookup[label]));
+    });
+
+    // 5. Series Score After Game 4 (6 selections — only output if G4 not yet played)
+    if (playedCount < 4 && m.afterG4 && !m.afterG4.settled && m.afterG4.legs && m.afterG4.legs.length >= 5) {
+      // Engine afterG4 leg ordering: [4,0], [3,1], [2,2], [1,3], [0,4]
+      // Cheat sheet output order: top 4-0, bot 4-0, top 3-1, bot 3-1, top 2-2, bot 2-2
+      // Note: cheat sheet has BOTH top 2-2 AND bot 2-2 but engine combines into single Tied 2-2
+      // We'll split the 2-2 prob 50/50 between top/bot since they're equally likely from a tied state.
+      // Actually re-reading the cheat sheet: rows show "Carolina Hurricanes 2-2 | Philadelphia Flyers 2-2"
+      // which implies both teams' "currently leading 2-2" states. Since 2-2 is one outcome,
+      // we'll output the Tied 2-2 prob under the topFull selection and 0 elsewhere — but that's wrong.
+      // Cleanest fix: output the 2-2 prob just once as topFull's selection (NATS would interpret).
+      // But cheat sheet seems to expect two separate selections. So we split 50/50.
+      const ag4Legs = m.afterG4.legs;
+      const top40 = ag4Legs[0].offered;
+      const top31 = ag4Legs[1].offered;
+      const tied22 = ag4Legs[2].offered;
+      const bot31 = ag4Legs[3].offered;
+      const bot40 = ag4Legs[4].offered;
+      // 2-2 is one state. Cheat sheet has both top 2-2 and bot 2-2 rows — same price each.
+      push('afterG4', matchupShort + ' Series Score After Game 4', topFull + ' 4-0', fmtPrice(top40));
+      push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 4-0', fmtPrice(bot40));
+      push('afterG4', matchupShort + ' Series Score After Game 4', topFull + ' 3-1', fmtPrice(top31));
+      push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 3-1', fmtPrice(bot31));
+      push('afterG4', matchupShort + ' Series Score After Game 4', topFull + ' 2-2', fmtPrice(tied22));
+      push('afterG4', matchupShort + ' Series Score After Game 4', botFull + ' 2-2', fmtPrice(tied22));
+    }
+
+    // 6. Series Score After Game 3 (4 selections — only if G3 not yet played)
+    if (playedCount < 3 && m.afterG3 && !m.afterG3.settled && m.afterG3.legs && m.afterG3.legs.length >= 4) {
+      // Engine afterG3 ordering: [3,0], [2,1], [1,2], [0,3]
+      // Cheat sheet ordering: top 3-0, bot 3-0, top 2-1, bot 2-1
+      const ag3Legs = m.afterG3.legs;
+      push('afterG3', matchupShort + ' Series Score After Game 3', topFull + ' 3-0', fmtPrice(ag3Legs[0].offered));
+      push('afterG3', matchupShort + ' Series Score After Game 3', botFull + ' 3-0', fmtPrice(ag3Legs[3].offered));
+      push('afterG3', matchupShort + ' Series Score After Game 3', topFull + ' 2-1', fmtPrice(ag3Legs[1].offered));
+      push('afterG3', matchupShort + ' Series Score After Game 3', botFull + ' 2-1', fmtPrice(ag3Legs[2].offered));
+    }
+
+    // 7. Series Total Games (2 selections — Over 5.5, Under 5.5)
+    // Engine totalGamesOU is a paired market with O/U lines at 4.5, 5.5, 6.5
+    // We only need 5.5 line for the cheat sheet
+    if (m.totalGamesOU && m.totalGamesOU.pairs) {
+      const target = m.totalGamesOU.pairs.find(p =>
+        p.legs.some(l => /5\.5/.test(l.label || ''))
+      );
+      if (target) {
+        const overLeg  = target.legs.find(l => /Over/i.test(l.label) || /^O/i.test(l.label));
+        const underLeg = target.legs.find(l => /Under/i.test(l.label) || /^U/i.test(l.label));
+        if (overLeg)  push('totalGamesOU', matchupShort + ' Series Total Games', 'Over 5.5',  fmtPrice(overLeg.offered));
+        if (underLeg) push('totalGamesOU', matchupShort + ' Series Total Games', 'Under 5.5', fmtPrice(underLeg.offered));
+      }
+    }
+
+    // 8. Game 1 / Series Winner Parlay (4 selections — skip if G1 played, since 2 of 4 settle to 0)
+    if (playedCount < 1 && m.g1AndSeries && m.g1AndSeries.legs) {
+      const g1 = m.g1AndSeries.legs;
+      // Cheat sheet order: top/top, bot/bot, top/bot, bot/top
+      // Engine order: [top G1+top, top G1+bot, bot G1+top, bot G1+bot]
+      // Selection format: "<topFull> / <topFull>", etc.
+      const g1Lookup = {};
+      g1.forEach(leg => {
+        // Leg labels are "<topFull> G1 + <topFull> Series", etc.
+        // Convert to cheat sheet format "<TeamA> / <TeamB>"
+        const match = leg.label.match(/^(.+) G1 \+ (.+) Series$/);
+        if (match) g1Lookup[match[1] + ' / ' + match[2]] = leg.offered;
+      });
+      const g1Order = [
+        topFull + ' / ' + topFull,
+        botFull + ' / ' + botFull,
+        topFull + ' / ' + botFull,
+        botFull + ' / ' + topFull
+      ];
+      g1Order.forEach(sel => {
+        if (g1Lookup[sel] !== undefined) {
+          push('g1AndSeries', matchupShort + ' Game 1/Series Winner', sel, fmtPrice(g1Lookup[sel]));
+        }
+      });
+    }
+
+    // 9. Series From Behind / Never Trail (4 selections)
+    if (m.fromBehind && m.fromBehind.legs && m.fromBehind.legs.length >= 4) {
+      // Engine ordering: [0] top NT, [1] top FB, [2] bot NT, [3] bot FB
+      // Cheat sheet ordering: top FB, bot FB, top NT, bot NT
+      const fb = m.fromBehind.legs;
+      rows.push({ type: getMarketTypeLabel('fromBehind', slot), name: matchupShort + ' To Win Series From Behind', selection: topFull + ' To Win Series From Behind', price: fmtPrice(fb[1].offered) });
+      rows.push({ type: getMarketTypeLabel('fromBehind', slot), name: matchupShort + ' To Win Series From Behind', selection: botFull + ' To Win Series From Behind', price: fmtPrice(fb[3].offered) });
+      push('fromBehind', matchupShort + ' To Win Series From Behind', topFull + ' To Win Series and Never Trail', fmtPrice(fb[0].offered));
+      push('fromBehind', matchupShort + ' To Win Series From Behind', botFull + ' To Win Series and Never Trail', fmtPrice(fb[2].offered));
+    }
+
+    return rows;
+  }
+
+  // Convert an array of CSV rows to a string with header.
+  function csvRowsToString(rows) {
+    const header = 'Market Type,Market Name,Selection,Price';
+    const escape = (s) => {
+      if (s === null || s === undefined) return '';
+      const str = String(s);
+      if (/[,"\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+      return str;
+    };
+    const lines = rows.map(r => [r.type, r.name, r.selection, r.price].map(escape).join(','));
+    return [header].concat(lines).join('\n');
+  }
+
+
   global.PlayoffsEngine = {
     isTopHome,
     topWinProbForGame,
@@ -1090,6 +1326,10 @@
     getOutrightMargin,
     eligibleTeamsForSeries,
     seedR1FromStandings,
+    buildSeriesPropsCSV,
+    csvRowsToString,
+    getSeriesSlot,
+    getMarketTypeLabel,
     marginBadgeColor,
     fmtMargin,
     fmtPct,

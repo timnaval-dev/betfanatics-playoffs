@@ -932,6 +932,8 @@
       <div class="subtitle">Edit Live Config · Promote Winners · Export</div>
     </div>
     <div class="header-right">
+      <button id="exportSeriesCsvBtn" class="secondary">Export current series CSV</button>
+      <button id="exportAllCsvBtn" class="secondary">Export all series CSV</button>
       <button id="seedFromStandingsBtn" class="secondary">Initialize bracket from standings</button>
       <button id="exportBtn" class="primary">Export new playoffs.js</button>
     </div>
@@ -1921,6 +1923,66 @@ if (typeof module !== 'undefined' && module.exports) {
     });
     renderAll();
     renderModifiedBanner();
+  });
+
+  // CSV export: download a CSV of all series-prop markets for one or all series.
+  // Format: Market Type, Market Name, Selection, Price (decimal, 5 places).
+  // Skips: completed series, TBD series, settled markets.
+  function downloadCsv(filename, content) {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  document.getElementById('exportSeriesCsvBtn').addEventListener('click', () => {
+    if (!activeSeriesId) {
+      alert('No series is currently selected. Click on a series tab first.');
+      return;
+    }
+    const s = workingData.series[activeSeriesId];
+    if (!s) {
+      alert('Active series not found in workingData.');
+      return;
+    }
+    const rows = E.buildSeriesPropsCSV(s, workingData.defaults, activeSeriesId);
+    if (rows.length === 0) {
+      alert('No market rows to export. The series may be complete, both teams may not be known yet, or this series has no slot mapping (conf finals / SCF are outright markets, not in this CSV).');
+      return;
+    }
+    const csv = E.csvRowsToString(rows);
+    const matchupShort = (s.topSeed.short || 'TBD') + '_vs_' + (s.botSeed.short || 'TBD');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    downloadCsv(`series_${matchupShort}_${ts}.csv`, csv);
+  });
+
+  document.getElementById('exportAllCsvBtn').addEventListener('click', () => {
+    // Walk every series in workingData; concatenate rows.
+    const allRows = [];
+    let seriesExported = 0;
+    let seriesSkipped = 0;
+    Object.entries(workingData.series).forEach(([id, s]) => {
+      const rows = E.buildSeriesPropsCSV(s, workingData.defaults, id);
+      if (rows.length > 0) {
+        allRows.push(...rows);
+        seriesExported++;
+      } else {
+        seriesSkipped++;
+      }
+    });
+    if (allRows.length === 0) {
+      alert('No exportable series — all are either complete, TBD, or fully settled.');
+      return;
+    }
+    const csv = E.csvRowsToString(allRows);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    downloadCsv(`playoffs_all_series_${ts}.csv`, csv);
+    console.log(`Exported ${seriesExported} series (${allRows.length} rows). Skipped ${seriesSkipped} series.`);
   });
 
   document.getElementById('closeModalBtn').addEventListener('click', () => {
